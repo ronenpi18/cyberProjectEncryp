@@ -11,10 +11,13 @@ import java.net.Socket;
 import java.net.UnknownHostException;
 import java.security.InvalidKeyException;
 import java.util.ArrayList;
+import java.util.Calendar;
 
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Application;
+import android.app.ProgressDialog;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Typeface;
@@ -48,6 +51,8 @@ public class ChatActivity extends Activity{
 	Button sendBtn;
     Socket echoSocket;
     boolean isNewChat;
+    boolean needNewAes = false;
+    boolean activityKilled = false;
     String nextMsg = "";
     JSONObject nextMsgJson;
     boolean sendMsg = false;
@@ -56,8 +61,9 @@ public class ChatActivity extends Activity{
     int targetDrawable;
     int sourceDrawable;
     public static String WEB_HOME = "http://encrypchat.bl.ee/";
-	  ArrayList<String> web;
-	  ArrayList<Integer> imageId;
+	ArrayList<String> web;
+	ArrayList<Integer> imageId;
+    ArrayList<String> times;
     Encrypter encrypter;
 
 	  @Override
@@ -65,11 +71,10 @@ public class ChatActivity extends Activity{
 	    super.onCreate(savedInstanceState);
           web = new ArrayList<String>();
           imageId = new ArrayList<Integer>();
-          web.add("STARTED");
-          imageId.add(R.drawable.icon);
+          times = new ArrayList<String>();
           setContentView(R.layout.activity_chat);
           Typeface msgTypeface = Typeface.createFromAsset(getAssets(), "fonts/Roboto-Light.ttf");
-          adapter = new ChatList(ChatActivity.this, web, imageId, msgTypeface, 20);
+          adapter = new ChatList(ChatActivity.this, web, imageId, times, msgTypeface, 20);
           list = (ListView)findViewById(R.id.list);
           msgEt = (EditText) findViewById(R.id.msg_et);
           sendBtn = (Button) findViewById(R.id.button_sendMsg);
@@ -93,6 +98,7 @@ public class ChatActivity extends Activity{
           try {
               nextMsgJson.put(eConstants.JSON_MSG_FROM, sourceNumber);
               nextMsgJson.put(eConstants.JSON_MSG_TO, targetNumber);
+              nextMsgJson.put(eConstants.JSON_MSG_TIME, 0);
               nextMsgJson.put(eConstants.JSON_SERVER_REQTYPE, eConstants.REQTYPE_GETMSG);
           }catch (Exception e){
               e.printStackTrace();
@@ -126,8 +132,11 @@ public class ChatActivity extends Activity{
 			@Override
 			public void onClick(View v) {
                 String message = msgEt.getText().toString();
-				adapter.postMessage(sourceDrawable, message);
-                adapter.getView(0, findViewById(R.id.txt), null);
+				web.add(message);
+                imageId.add(sourceDrawable);
+                Calendar calendar = Calendar.getInstance();
+                times.add(millis2time(calendar.getTimeInMillis()));
+                adapter.notifyDataSetChanged();
                 String encryptedMessage = encrypter.AESEncrypt(message);
                // WebSigner webSigner = new WebSigner();
                // webSigner.execute(WEB_HOME + "send.php?from=" + sourceNumber + "&to=" + targetNumber + "&message=" + encryptedMessage + "&time=" + System.currentTimeMillis());
@@ -137,6 +146,7 @@ public class ChatActivity extends Activity{
                     nextMsgJson.put(eConstants.JSON_MSG_CONTENT, encrypter.AESEncrypt(nextMsg));
                     nextMsgJson.put(eConstants.JSON_MSG_TYPE, eConstants.MSGTYPE_TEXT);
                     nextMsgJson.put(eConstants.JSON_SERVER_REQTYPE, eConstants.REQTYPE_SENDMSG);
+                    nextMsgJson.put(eConstants.JSON_MSG_TIME, calendar.getTimeInMillis());
                     sendMsg = true;
                 }catch (Exception e){
                     e.printStackTrace();
@@ -147,23 +157,17 @@ public class ChatActivity extends Activity{
 			}
 		});
 
-
-          setTitle(encrypter.getAesKey());
-
 	  }
 
 
     @Override
     protected void onDestroy() {
-        if(!echoSocket.isClosed())
-            try {
-                echoSocket.close();
-            }catch (Exception e){
-
-            }finally {
-                super.onDestroy();
-            }
+        activityKilled = true;
+        super.onDestroy();
     }
+
+
+
 
 
     @Override
@@ -181,12 +185,41 @@ public class ChatActivity extends Activity{
                 AlertDialog.Builder aesDialogBuilder = new AlertDialog.Builder(ChatActivity.this);
                 aesDialogBuilder.setTitle("AES Key");
                 aesDialogBuilder.setMessage(encrypter.getAesKey());
+                aesDialogBuilder.setPositiveButton("Close", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialogInterface, int i) {
+
+                    }
+                });
+                aesDialogBuilder.setNegativeButton("Regenerate", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialogInterface, int i) {
+                        needNewAes = true;
+                    }
+                });
                 AlertDialog aesDialog = aesDialogBuilder.create();
                 aesDialog.show();
                 break;
         }
         return super.onOptionsItemSelected(item);
     }
+
+
+
+    public static String millis2time(long millis){
+        String min, hour;
+        Calendar cal = Calendar.getInstance();
+        cal.setTimeInMillis(millis);
+        min = Integer.toString(cal.get(Calendar.MINUTE));
+        hour = Integer.toString(cal.get(Calendar.HOUR_OF_DAY));
+        if(min.length() == 1)
+            min = "0" + min;
+        if(hour.length() == 1)
+            hour = "0" + hour;
+        return hour + ":" + min;
+    }
+
+
 
 
 
@@ -197,6 +230,8 @@ public class ChatActivity extends Activity{
         @Override
         protected String doInBackground(String... data) {
             establishConnection();
+            SharedPreferences prefs = getSharedPreferences(eConstants.PREFERENCES_FILE, 0);
+            SharedPreferences.Editor editor = prefs.edit();
             if(isNewChat)
             {
                 try {
@@ -220,7 +255,6 @@ public class ChatActivity extends Activity{
                         String privateKey = getSharedPreferences(eConstants.PREFERENCES_FILE,0).getString(eConstants.PREFS_PRIVATE_KEY, "");
                         String aes = Encrypter.RSADecrypt(prevMsg.getString(eConstants.JSON_MSG_CONTENT), privateKey);
                         encrypter.setAESKey(aes);
-                        SharedPreferences.Editor editor = getSharedPreferences(eConstants.PREFERENCES_FILE,0).edit();
                         editor.putString(targetNumber + "AES", aes);
                         editor.commit();
                     }
@@ -236,6 +270,14 @@ public class ChatActivity extends Activity{
 
             int x = 0;
             while(x < 1) {
+                if(activityKilled)
+                    try {
+                        echoSocket.close();
+                        break;
+                    }catch (IOException e){
+                        e.printStackTrace();
+                    }
+
                 try {
                     PrintWriter out = new PrintWriter(echoSocket.getOutputStream(), true);
                     BufferedReader in = new BufferedReader(new InputStreamReader(echoSocket.getInputStream()));
@@ -246,33 +288,72 @@ public class ChatActivity extends Activity{
                         nextMsgJson.put(eConstants.JSON_SERVER_REQTYPE, eConstants.REQTYPE_GETMSG);
                     }
 
-                    //publishProgress(in.readLine());
                     String response = in.readLine();
-                    if(!response.equals("0") && response.charAt(0) == '{') {
+                    if(!response.equals("0") && response.charAt(0) == '{') {    //NEW MSG RECEIVED
                         JSONObject msg = new JSONObject(response);
                         int responseType = msg.getInt(eConstants.JSON_SERVER_REQTYPE);
                         int messageType = msg.getInt(eConstants.JSON_MSG_TYPE);
                         String message = msg.getString(eConstants.JSON_MSG_CONTENT);
+                        long time_t = msg.getLong(eConstants.JSON_MSG_TIME);
                         switch (messageType)
                         {
                             case eConstants.MSGTYPE_TEXT:
-                                publishProgress(encrypter.AESDecrypt(message));
+                                String[] params1 = {encrypter.AESDecrypt(message), millis2time(time_t)};
+                                publishProgress(params1);
+
                                 break;
                             case eConstants.MSGTYPE_AES:
-                                String privateKey = getSharedPreferences(eConstants.PREFERENCES_FILE,0).getString(eConstants.PREFS_PRIVATE_KEY, "");
+                                String privateKey = prefs.getString(eConstants.PREFS_PRIVATE_KEY, "");
                                 String aes = Encrypter.RSADecrypt(message, privateKey);
                                 encrypter.setAESKey(aes);
-                                SharedPreferences.Editor editor = getSharedPreferences(eConstants.PREFERENCES_FILE,0).edit();
                                 editor.putString(targetNumber + "AES", aes);
                                 editor.commit();
+                                String[] params2 = {"TOAST", "AES key updated by partner"};
+                                publishProgress(params2);
                                 break;
                         }
                     }
-                    Thread.sleep(200);
+                    if(needNewAes){
+                        needNewAes = false;
+                        String[] progressParams = {"DIALOG","Generating a new AES key..."};
+                        publishProgress(progressParams);
+                        encrypter = new Encrypter();
+                        progressParams[0] = "AES";
+                        progressParams[1] = "Saving new AES key...";
+                        publishProgress(progressParams);
+                        editor.putString(targetNumber + "AES", encrypter.getAesKey());
+                        editor.commit();
+                        progressParams[1] = "Getting partner's public RSA key...";
+                        publishProgress(progressParams);
+                        nextMsgJson.put(eConstants.JSON_SERVER_REQTYPE, eConstants.REQTYPE_GETPK);
+                        out.println(nextMsgJson.toString());
+                        String pk = in.readLine();
+                        progressParams[1] = "Encrypting AES key...";
+                        publishProgress(progressParams);
+                        String encryptedAes = Encrypter.RSAEncrypt(encrypter.getAesKey(), pk);
+
+                        progressParams[1] = "Sending encrypted AES key...";
+                        publishProgress(progressParams);
+                        nextMsgJson.put(eConstants.JSON_MSG_CONTENT, encryptedAes);
+                        nextMsgJson.put(eConstants.JSON_SERVER_REQTYPE, eConstants.REQTYPE_SENDMSG);
+                        nextMsgJson.put(eConstants.JSON_MSG_TYPE, eConstants.MSGTYPE_AES);
+                        out.println(nextMsgJson.toString());
+                        in.readLine();
+
+                        progressParams[1] = "Done. Flushing...";
+                        publishProgress(progressParams);
+                        nextMsgJson.put(eConstants.JSON_MSG_CONTENT, "");
+                        nextMsgJson.put(eConstants.JSON_SERVER_REQTYPE, eConstants.REQTYPE_GETMSG);
+                        nextMsgJson.put(eConstants.JSON_MSG_TYPE, eConstants.MSGTYPE_TEXT);
+
+                        publishProgress("DONE");
+                    }
+                    Thread.sleep(150);
                 }catch (Exception e){
                     e.printStackTrace();
                     establishConnection();
                 }
+
             }
             return null;
         }
@@ -288,20 +369,33 @@ public class ChatActivity extends Activity{
             }
         }
 
+        ProgressDialog dialog;
 
         @Override
         protected void onProgressUpdate(String... msg) {
             super.onProgressUpdate(msg);
             if(msg[0].equals("0"))
                 return;
-            try {
+            else if(msg[0].equals("DIALOG"))
+            {
+                dialog = new ProgressDialog(ChatActivity.this);
+                dialog.setTitle("Changing AES Key...");
+                dialog.setMessage(msg[1]);
+                dialog.setCancelable(false);
+                dialog.show();
+            }else if(msg[0].equals("AES")) {
+                dialog.setMessage(msg[1]);
+            }else if(msg[0].equals("DONE")){
+                dialog.dismiss();
+            }else if(msg[0].equals("TOAST")){
+                Toast.makeText(ChatActivity.this, msg[1], Toast.LENGTH_SHORT).show();
+            } else if(msg[0].length() > 0 && msg.length == 2){
                 web.add(msg[0]);
+                times.add(msg[1]);
                 imageId.add(targetDrawable);
                 adapter.notifyDataSetChanged();
-            }catch (Exception e){
-                e.printStackTrace();
-                Toast.makeText(ChatActivity.this, "Decryption error", Toast.LENGTH_SHORT);
             }
+
 
             /*
             try {
@@ -407,7 +501,6 @@ public class ChatActivity extends Activity{
                 editor.putString(targetNumber + "AES", AesKey);
                 editor.commit();
                 encrypter.setAESKey(AesKey);
-                setTitle("AES: " + AesKey);
             }
             else {
                 web.add(msg);
@@ -608,8 +701,9 @@ public class ChatActivity extends Activity{
                     decodedMsg = encodedMsg.substring(1);
                     if(encodedMsg.charAt(0) == '1')
                         encrypter.setAESKey(decodedMsg);
-                    else
-                        adapter.postMessage(targetDrawable, encrypter.AESDecrypt(decodedMsg));
+                    else {
+                       //WAS ADAPTER.POSTMESSAGE
+                    }
                 }
             }catch (Exception e){
                 int x;

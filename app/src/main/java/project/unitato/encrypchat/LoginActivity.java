@@ -154,21 +154,39 @@ public class LoginActivity extends ActionBarActivity {
 
     private class mTask2 extends AsyncTask<String, String, String>
     {
+
+        ProgressDialog dialog;
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+            dialog = new ProgressDialog(LoginActivity.this);
+            dialog.setTitle("Registration");
+            dialog.setMessage("Please wait...");
+            dialog.setCancelable(false);
+            dialog.show();
+        }
+
+
+
         @Override
         protected String doInBackground(String... params) {
             try {
+                publishProgress("Generating an RSA key pair...");
                 JSONObject data = new JSONObject();
                 String number = params[0];
                 data.put(eConstants.JSON_MSG_FROM, number);
                 data.put(eConstants.JSON_SERVER_REQTYPE, eConstants.REQTYPE_REGISTER);
                 kp = Encrypter.GenerateRSAKeyPair();
+                publishProgress("Connecting...");
                 echoSocket = new Socket(eConstants.SOCKET_HOST, eConstants.SOCKET_PORT);
                 PrintWriter out = new PrintWriter(echoSocket.getOutputStream(), true);
                 BufferedReader in = new BufferedReader(new InputStreamReader(echoSocket.getInputStream()));
                 data.put(eConstants.JSON_MSG_CONTENT, Encrypter.public2string(kp.getPublic()));
+                publishProgress("Registering...");
                 out.println(data.toString());
                 String response = in.readLine();
                 echoSocket.close();
+                publishProgress("Done. Saving data...");
                 return response;
             }catch (Exception e){
                 e.printStackTrace();
@@ -179,6 +197,7 @@ public class LoginActivity extends ActionBarActivity {
         @Override
         protected void onProgressUpdate(String... values) {
             super.onProgressUpdate(values);
+            dialog.setMessage(values[0]);
         }
 
         @Override
@@ -193,6 +212,7 @@ public class LoginActivity extends ActionBarActivity {
                 Intent data = new Intent();
                 data.putExtra(eConstants.PREFS_PHONE_NUMEBR, phoneNumber);
                 setResult(0, data);
+                dialog.dismiss();
                 finish();
             }else if(response.equals("1"))
             {

@@ -5,14 +5,15 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class eConstants {
-    public static final String SOCKET_HOST = "10.0.0.5";//"31.220.49.240";
-    public static final int SOCKET_PORT = 6969;//47395;
+    public static final String SOCKET_HOST = "31.220.49.240";
+    public static final int SOCKET_PORT = 47395;
 
     public static final String JSON_SERVER_REQTYPE = "reqtype";
     public static final String JSON_MSG_TYPE = "type";
     public static final String JSON_MSG_CONTENT = "content";
     public static final String JSON_MSG_FROM = "from";
     public static final String JSON_MSG_TO = "to";
+    public static final String JSON_MSG_TIME = "time";
 
     public static final int REQTYPE_SENDMSG = 0;
     public static final int REQTYPE_GETMSG = 1;

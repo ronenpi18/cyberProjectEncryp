@@ -60,7 +60,7 @@ public class ChatsActivity extends ActionBarActivity {
     int RESULT_LOGIN = 0;
     int RESULT_CONTACT = 1;
     ListView list;
-    ChatList adapter;
+    ChatsList adapter;
     String nextMsg = "";
     String encryptedAES;
     String targetPublicKey;
@@ -126,7 +126,7 @@ public class ChatsActivity extends ActionBarActivity {
         }
         setContentView(R.layout.activity_chats);
         Typeface msgTypeface = Typeface.createFromAsset(getAssets(), "fonts/Roboto-Thin.ttf");
-        adapter = new ChatList(ChatsActivity.this, web, imageId, msgTypeface, 40);
+        adapter = new ChatsList(ChatsActivity.this, web, imageId, msgTypeface, 40);
         list = (ListView)findViewById(R.id.allchats_list);
         list.setAdapter(adapter);
         encrypter = new Encrypter();
@@ -228,7 +228,7 @@ public class ChatsActivity extends ActionBarActivity {
                             editor.putString(eConstants.PREFS_CHATS, allchats);
                             editor.commit();
                             adapter.notifyDataSetChanged();
-                            beginChat(number);
+                            beginChat(filterNumber(number));
                         }
                     }
                 }
