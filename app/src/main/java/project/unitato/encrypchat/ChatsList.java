@@ -50,7 +50,7 @@ public class ChatsList extends ArrayAdapter<String>{
 	@Override
 	public View getView(int position, View view, ViewGroup parent) {
 		LayoutInflater inflater = context.getLayoutInflater();
-		View rowView= inflater.inflate(R.layout.chat_single, null, true);
+		View rowView= inflater.inflate(R.layout.chats_single, null, true);
 		TextView txtTitle = (TextView) rowView.findViewById(R.id.txt);
 		ImageView imageView = (ImageView) rowView.findViewById(R.id.img);
 		txtTitle.setText((String)web.toArray()[position]);

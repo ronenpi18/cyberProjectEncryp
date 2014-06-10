@@ -6,10 +6,6 @@
     <item android:state_pressed="true">
         <shape android:shape="rectangle" >
 
-            <corners
-                android:topLeftRadius="10dp"
-                android:bottomLeftRadius="10dp"
-                />
             <stroke
                 android:color="#000000"
                 android:width="0.5dp" />
@@ -23,11 +19,6 @@
 
     <item>
         <shape android:shape="rectangle" >
-
-            <corners
-                android:bottomLeftRadius="10dp"
-                android:topLeftRadius="10dp"
-                />
             <stroke
                 android:color="#000000"
                 android:width="1dp" />

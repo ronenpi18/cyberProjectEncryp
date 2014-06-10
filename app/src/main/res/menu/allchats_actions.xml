@@ -6,10 +6,10 @@
     <item android:id="@+id/action_new"
         android:icon="@android:drawable/ic_menu_add"
 
-        android:title="new"
+        android:title="New"
         encrypchat:showAsAction="always" />
     <!-- Settings, should always be in the overflow -->
-    <item android:id="@+id/action_settings"
-        android:title="@string/action_settings"
+    <item android:id="@+id/action_reset"
+        android:title="Reset All"
         encrypchat:showAsAction="never" />
 </menu>

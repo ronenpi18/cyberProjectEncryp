@@ -3,14 +3,19 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="horizontal"
-    android:background="#FFFFFF" >
+    android:background="#FFFFFF"
+    android:id="@+id/chat_single_layout"
+    android:paddingLeft="15dp"
+    android:paddingRight="15dp"
+    android:paddingTop="15dp"
+    android:paddingBottom="15dp">
         <ImageView
             android:layout_alignParentTop="true"
             android:layout_alignParentLeft="true"
             android:id="@+id/img"
             android:scaleType="centerCrop"
-            android:layout_width="70dp"
-            android:layout_height="70dp"/>
+            android:layout_width="60dp"
+            android:layout_height="60dp"/>
         <TextView
             android:text="message"
             android:paddingLeft="10dp"

@@ -16,15 +16,26 @@ import java.util.Calendar;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Application;
+import android.app.Notification;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.app.ProgressDialog;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Typeface;
 import android.hardware.Camera;
+import android.media.MediaPlayer;
+import android.media.Ringtone;
+import android.media.RingtoneManager;
+import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.SystemClock;
+import android.provider.MediaStore;
+import android.support.v4.app.NotificationCompat;
+import android.support.v4.app.TaskStackBuilder;
 import android.text.Html;
 import android.util.Log;
 import android.view.KeyEvent;
@@ -42,6 +53,7 @@ import android.widget.Toast;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.DefaultHttpClient;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 public class ChatActivity extends Activity{
@@ -74,7 +86,7 @@ public class ChatActivity extends Activity{
           times = new ArrayList<String>();
           setContentView(R.layout.activity_chat);
           Typeface msgTypeface = Typeface.createFromAsset(getAssets(), "fonts/Roboto-Light.ttf");
-          adapter = new ChatList(ChatActivity.this, web, imageId, times, msgTypeface, 20);
+          adapter = new ChatList(ChatActivity.this, web, imageId, times, msgTypeface, 25);
           list = (ListView)findViewById(R.id.list);
           msgEt = (EditText) findViewById(R.id.msg_et);
           sendBtn = (Button) findViewById(R.id.button_sendMsg);
@@ -131,29 +143,7 @@ public class ChatActivity extends Activity{
 			
 			@Override
 			public void onClick(View v) {
-                String message = msgEt.getText().toString();
-				web.add(message);
-                imageId.add(sourceDrawable);
-                Calendar calendar = Calendar.getInstance();
-                times.add(millis2time(calendar.getTimeInMillis()));
-                adapter.notifyDataSetChanged();
-                String encryptedMessage = encrypter.AESEncrypt(message);
-               // WebSigner webSigner = new WebSigner();
-               // webSigner.execute(WEB_HOME + "send.php?from=" + sourceNumber + "&to=" + targetNumber + "&message=" + encryptedMessage + "&time=" + System.currentTimeMillis());
-                //nextMsg = "0" + encryptedMessage;
-                nextMsg = msgEt.getText().toString();
-                try {
-                    nextMsgJson.put(eConstants.JSON_MSG_CONTENT, encrypter.AESEncrypt(nextMsg));
-                    nextMsgJson.put(eConstants.JSON_MSG_TYPE, eConstants.MSGTYPE_TEXT);
-                    nextMsgJson.put(eConstants.JSON_SERVER_REQTYPE, eConstants.REQTYPE_SENDMSG);
-                    nextMsgJson.put(eConstants.JSON_MSG_TIME, calendar.getTimeInMillis());
-                    sendMsg = true;
-                }catch (Exception e){
-                    e.printStackTrace();
-                }
-                msgEt.setText("");
-
-
+                sendMsg();
 			}
 		});
 
@@ -166,8 +156,45 @@ public class ChatActivity extends Activity{
         super.onDestroy();
     }
 
+    @Override
+    public void finish(){
+        super.finish();
+        overridePendingTransition(R.anim.activity_enter_r2l, R.anim.activity_leave_r2l);
+    }
 
 
+    @Override
+    public boolean onKeyUp(int keyCode, KeyEvent event) {
+        if(keyCode == KeyEvent.KEYCODE_ENTER)
+            sendMsg();
+        return super.onKeyUp(keyCode, event);
+    }
+
+    private void sendMsg(){
+        String message = msgEt.getText().toString();
+        if(message.length() == 0)
+            return;
+        web.add(message);
+        imageId.add(sourceDrawable);
+        Calendar calendar = Calendar.getInstance();
+        times.add(millis2time(calendar.getTimeInMillis()));
+        adapter.notifyDataSetChanged();
+        String encryptedMessage = encrypter.AESEncrypt(message);
+        // WebSigner webSigner = new WebSigner();
+        // webSigner.execute(WEB_HOME + "send.php?from=" + sourceNumber + "&to=" + targetNumber + "&message=" + encryptedMessage + "&time=" + System.currentTimeMillis());
+        //nextMsg = "0" + encryptedMessage;
+        nextMsg = msgEt.getText().toString();
+        try {
+            nextMsgJson.put(eConstants.JSON_MSG_CONTENT, encrypter.AESEncrypt(nextMsg));
+            nextMsgJson.put(eConstants.JSON_MSG_TYPE, eConstants.MSGTYPE_TEXT);
+            nextMsgJson.put(eConstants.JSON_SERVER_REQTYPE, eConstants.REQTYPE_SENDMSG);
+            nextMsgJson.put(eConstants.JSON_MSG_TIME, calendar.getTimeInMillis());
+            sendMsg = true;
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+        msgEt.setText("");
+    }
 
 
     @Override
@@ -291,25 +318,27 @@ public class ChatActivity extends Activity{
                     String response = in.readLine();
                     if(!response.equals("0") && response.charAt(0) == '{') {    //NEW MSG RECEIVED
                         JSONObject msg = new JSONObject(response);
-                        int responseType = msg.getInt(eConstants.JSON_SERVER_REQTYPE);
+                        String from = msg.getString(eConstants.JSON_MSG_FROM);
                         int messageType = msg.getInt(eConstants.JSON_MSG_TYPE);
                         String message = msg.getString(eConstants.JSON_MSG_CONTENT);
                         long time_t = msg.getLong(eConstants.JSON_MSG_TIME);
+                        if(from.equals(targetNumber))
                         switch (messageType)
                         {
                             case eConstants.MSGTYPE_TEXT:
                                 String[] params1 = {encrypter.AESDecrypt(message), millis2time(time_t)};
                                 publishProgress(params1);
-
                                 break;
                             case eConstants.MSGTYPE_AES:
                                 String privateKey = prefs.getString(eConstants.PREFS_PRIVATE_KEY, "");
                                 String aes = Encrypter.RSADecrypt(message, privateKey);
-                                encrypter.setAESKey(aes);
-                                editor.putString(targetNumber + "AES", aes);
-                                editor.commit();
-                                String[] params2 = {"TOAST", "AES key updated by partner"};
-                                publishProgress(params2);
+                                if(aes.length() == 16) {
+                                    encrypter.setAESKey(aes);
+                                    editor.putString(targetNumber + "AES", aes);
+                                    editor.commit();
+                                    String[] params2 = {"TOAST", "AES key updated by partner"};
+                                    publishProgress(params2);
+                                }
                                 break;
                         }
                     }
@@ -349,9 +378,15 @@ public class ChatActivity extends Activity{
                         publishProgress("DONE");
                     }
                     Thread.sleep(150);
-                }catch (Exception e){
+                } catch (IOException e){ //NO CONNECTION
                     e.printStackTrace();
+                    String[] params = {"TOAST", "CONNECTION ERROR"};
+                    publishProgress("CON_ERR");
                     establishConnection();
+                } catch (JSONException e){
+
+                } catch (Exception e){
+
                 }
 
             }
@@ -363,9 +398,18 @@ public class ChatActivity extends Activity{
         {
             try {
                 echoSocket = new Socket(eConstants.SOCKET_HOST, eConstants.SOCKET_PORT);
-            }catch (Exception e){
+            }catch (IOException e){
                 e.printStackTrace();
+                String[] params = {"TOAST", "CONNECTION ERROR"};
+                publishProgress("CON_ERR");
+                try {
+                    Thread.sleep(500);
+                }catch (InterruptedException e1){
+
+                }
                 establishConnection();
+            }finally {
+                publishProgress("CON_OK");
             }
         }
 
@@ -374,28 +418,38 @@ public class ChatActivity extends Activity{
         @Override
         protected void onProgressUpdate(String... msg) {
             super.onProgressUpdate(msg);
-            if(msg[0].equals("0"))
+            if (msg[0].equals("0"))
                 return;
-            else if(msg[0].equals("DIALOG"))
-            {
+            else if (msg[0].equals("DIALOG")) {
                 dialog = new ProgressDialog(ChatActivity.this);
                 dialog.setTitle("Changing AES Key...");
                 dialog.setMessage(msg[1]);
                 dialog.setCancelable(false);
                 dialog.show();
-            }else if(msg[0].equals("AES")) {
+            } else if (msg[0].equals("AES")) {
                 dialog.setMessage(msg[1]);
-            }else if(msg[0].equals("DONE")){
+            } else if (msg[0].equals("DONE")) {
                 dialog.dismiss();
-            }else if(msg[0].equals("TOAST")){
+            } else if (msg[0].equals("TOAST")) {
                 Toast.makeText(ChatActivity.this, msg[1], Toast.LENGTH_SHORT).show();
-            } else if(msg[0].length() > 0 && msg.length == 2){
+            } else if (msg[0].equals("CON_ERR")) {
+                sendBtn.setClickable(false);
+            } else if (msg[0].equals("CON_OK")) {
+                sendBtn.setClickable(true);
+            } else if (msg[0].length() > 0 && msg.length == 2) {
+                try {
+                    Uri notification = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+                    Ringtone r = RingtoneManager.getRingtone(getApplicationContext(), notification);
+                    r.play();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
                 web.add(msg[0]);
                 times.add(msg[1]);
                 imageId.add(targetDrawable);
                 adapter.notifyDataSetChanged();
+                showNotification(targetNumber, msg[0]);
             }
-
 
             /*
             try {
@@ -412,11 +466,21 @@ public class ChatActivity extends Activity{
             }catch (Exception e){
                 e.printStackTrace();
             }*/
-
-
-
-
         }
+
+
+
+        public void showNotification(String from, String message){
+            NotificationCompat.Builder mBuilder =
+                    new NotificationCompat.Builder(ChatActivity.this)
+                            .setSmallIcon(R.drawable.icon)
+                            .setContentTitle(from)
+                            .setContentText(message);
+            NotificationManager mNotificationManager =
+                    (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            mNotificationManager.notify(0, mBuilder.build());
+        }
+
 
         @Override
         protected void onPostExecute(String data) {
@@ -426,6 +490,7 @@ public class ChatActivity extends Activity{
             adapter.notifyDataSetChanged();
         }
     }
+
 
     private class mTask extends AsyncTask<String, String, String>
     {

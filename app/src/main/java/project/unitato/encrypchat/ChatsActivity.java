@@ -2,6 +2,7 @@ package project.unitato.encrypchat;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.Application;
 import android.app.ListActivity;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -77,7 +78,8 @@ public class ChatsActivity extends ActionBarActivity {
     Encrypter encrypter;
 
 
-
+//TODO TOMMOROW
+    //TRY LOCALLY TO USE MULTIPLE CHATS
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -241,11 +243,12 @@ public class ChatsActivity extends ActionBarActivity {
     {
         Intent i = new Intent(this, ChatActivity.class);
         i.putExtra(eConstants.EXTRA_SELF_NUMBER, filterNumber(phoneNumber));
-        if(number.charAt(0) >= '0' && number.charAt(0) <= '9')
+        if((number.charAt(0) >= '0' && number.charAt(0) <= '9') || number.charAt(0) == '(')
             i.putExtra(eConstants.EXTRA_TARGET_NUMBER, filterNumber(number));
         else
             i.putExtra(eConstants.EXTRA_TARGET_NUMBER, number);
         startActivity(i);
+        overridePendingTransition(R.anim.activity_enter_l2r,R.anim.activity_leave_l2r);
     }
 
     public static String filterNumber(String number)
@@ -442,13 +445,19 @@ public class ChatsActivity extends ActionBarActivity {
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        if(item.getItemId() == R.id.action_new)
+        switch (item.getItemId())
         {
-            // user BoD suggests using Intent.ACTION_PICK instead of .ACTION_GET_CONTENT to avoid the chooser
-            Intent intent = new Intent(Intent.ACTION_PICK);
-            // BoD con't: CONTENT_TYPE instead of CONTENT_ITEM_TYPE
-            intent.setType(ContactsContract.CommonDataKinds.Phone.CONTENT_TYPE);
-            startActivityForResult(intent, RESULT_CONTACT);
+            case R.id.action_new:
+                // user BoD suggests using Intent.ACTION_PICK instead of .ACTION_GET_CONTENT to avoid the chooser
+                Intent intent = new Intent(Intent.ACTION_PICK);
+                // BoD con't: CONTENT_TYPE instead of CONTENT_ITEM_TYPE
+                intent.setType(ContactsContract.CommonDataKinds.Phone.CONTENT_TYPE);
+                startActivityForResult(intent, RESULT_CONTACT);
+                break;
+            case R.id.action_reset:
+                editor.clear();
+                editor.commit();
+                finish();
         }
         return super.onOptionsItemSelected(item);
     }

@@ -4,14 +4,14 @@
     android:layout_height="wrap_content"
     android:orientation="horizontal"
     android:background="#FFFFFF"
-    android:padding="5dp">
+    android:padding="15dp">
         <ImageView
             android:layout_alignParentTop="true"
             android:layout_alignParentLeft="true"
             android:id="@+id/img"
             android:scaleType="centerCrop"
-            android:layout_width="70dp"
-            android:layout_height="70dp"/>
+            android:layout_width="60dp"
+            android:layout_height="60dp"/>
         <TextView
             android:text="message"
             android:paddingLeft="10dp"
@@ -19,6 +19,6 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:textSize="20sp"
-            android:layout_alignParentTop="true"
+            android:layout_centerVertical="true"
             android:layout_toRightOf="@+id/img"/>
 </RelativeLayout>
