@@ -1,48 +1,37 @@
 package project.unitato.encrypchat;
 
 import android.app.Activity;
-import android.app.AlertDialog;
-import android.app.Application;
-import android.app.ListActivity;
+import android.app.Notification;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.graphics.Typeface;
+import android.media.Ringtone;
+import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
-import android.provider.Contacts;
 import android.provider.ContactsContract;
+import android.support.v4.app.NotificationCompat;
 import android.support.v7.app.ActionBarActivity;
-import android.text.AndroidCharacter;
-import android.text.Html;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.AdapterView;
-import android.widget.Button;
-import android.widget.EditText;
 import android.widget.ListView;
-import android.widget.Toast;
 
-import org.apache.http.HttpResponse;
-import org.apache.http.NameValuePair;
-import org.apache.http.client.ClientProtocolException;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.entity.UrlEncodedFormEntity;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.message.BasicNameValuePair;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
@@ -50,7 +39,6 @@ import java.net.InetAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
-import java.util.List;
 
 
 public class ChatsActivity extends ActionBarActivity {
@@ -62,29 +50,20 @@ public class ChatsActivity extends ActionBarActivity {
     int RESULT_CONTACT = 1;
     ListView list;
     ChatsList adapter;
-    String nextMsg = "";
-    String encryptedAES;
-    String targetPublicKey;
-    MessageRetriever messageRetriever;
     SharedPreferences prefs;
     SharedPreferences.Editor editor;
-    String targetNumber;
-    String sourceNumber;
-    public static String WEB_HOME = "http://encrypchat.bl.ee/";
-    public static String EXTRA_TARGET_NUMBER = "target_number";
-    public static String EXTRA_SELF_NUMBER = "number";
     ArrayList<String> web;
+    ArrayList<String> lastMsgs;
     ArrayList<Integer> imageId;
-    Encrypter encrypter;
-
-
-//TODO TOMMOROW
-    //TRY LOCALLY TO USE MULTIPLE CHATS
+    Socket echoSocket;
+    boolean activityKilled = false;
+    boolean activityActive = true;
+    boolean newChat = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        prefs = getPreferences(0);
+        prefs = getSharedPreferences(eConstants.PREFERENCES_FILE, 0);
         editor = prefs.edit();
 
         //Check if user registered yet
@@ -96,18 +75,20 @@ public class ChatsActivity extends ActionBarActivity {
         {
             phoneNumber = prefs.getString(eConstants.PREFS_PHONE_NUMEBR, "0");
             setTitle("Your phone is: " + phoneNumber.substring(0,3) + "-" + phoneNumber.substring(3, 6) + "-" + phoneNumber.substring(6));
-            //Intent msgServiceIntent = new Intent(this, MessageService.class);TODO later
-            //startService(msgServiceIntent);
+            new mTask2().execute();
         }
 
 
 
         web = new ArrayList<String>();
         imageId = new ArrayList<Integer>();
+        lastMsgs = new ArrayList<String>();
+
         if(prefs.getString(eConstants.PREFS_CHATS, "").equals(""))
         {
             web.add("NO CHATS");
-            imageId.add(R.drawable.icon);
+            imageId.add(R.drawable.night_blur);
+            lastMsgs.add("Tap '+'");
         }else{
             String data = prefs.getString(eConstants.PREFS_CHATS, "");
             String number = "";
@@ -125,18 +106,31 @@ public class ChatsActivity extends ActionBarActivity {
                     number = "";
                 }else
                     number += data.charAt(i);
+            //Get last msg
+            for(int i = 0; i < web.size(); i++)
+            {
+                String allmsgs = prefs.getString(eConstants.getNumberByName((String)web.toArray()[i]) + "MSGS", "");
+                if(allmsgs.length() > 0) {
+                    int j;
+                    for (j = allmsgs.length() - 1; allmsgs.charAt(j) != '{'; j--) ;
+                    try {
+                        JSONObject lastMsgJson = new JSONObject(allmsgs.substring(j));
+                        lastMsgs.add(lastMsgJson.getString(eConstants.JSON_MSG_CONTENT));
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+                }else{
+                    lastMsgs.add("");
+                }
+            }
         }
+
+
         setContentView(R.layout.activity_chats);
         Typeface msgTypeface = Typeface.createFromAsset(getAssets(), "fonts/Roboto-Thin.ttf");
-        adapter = new ChatsList(ChatsActivity.this, web, imageId, msgTypeface, 40);
+        adapter = new ChatsList(ChatsActivity.this, web, imageId, lastMsgs, msgTypeface, 40);
         list = (ListView)findViewById(R.id.allchats_list);
         list.setAdapter(adapter);
-        encrypter = new Encrypter();
-
-
-
-
-
 
 
         list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
@@ -146,12 +140,19 @@ public class ChatsActivity extends ActionBarActivity {
             }
         });
 
+
         setTitle("Encrypchat");
 
     }
 
 
-
+    @Override
+    public boolean onKeyUp(int keyCode, KeyEvent event) {
+        if(keyCode != KeyEvent.KEYCODE_BACK)
+            return super.onKeyUp(keyCode, event);
+        else
+            return super.onKeyUp(KeyEvent.KEYCODE_HOME, event);
+    }
 
     class ClientThread implements Runnable {
 
@@ -191,6 +192,35 @@ public class ChatsActivity extends ActionBarActivity {
 
 
 
+    private void refreshLastMsgs()
+    {
+        for(int i = 0; i < web.size(); i++)
+        {
+            String allmsgs = prefs.getString(eConstants.getNumberByName((String)web.toArray()[i]) + "MSGS", "");
+            if(allmsgs.length() > 0) {
+                int j;
+                for (j = allmsgs.length() - 1; allmsgs.charAt(j) != '{'; j--) ;
+                try {
+                    JSONObject lastMsgJson = new JSONObject(allmsgs.substring(j));
+                    if(i < lastMsgs.size())
+                        lastMsgs.set(i, lastMsgJson.getString(eConstants.JSON_MSG_CONTENT));
+                    else
+                        lastMsgs.add(lastMsgJson.getString(eConstants.JSON_MSG_CONTENT));
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+            }else{
+                if(i < lastMsgs.size())
+                    lastMsgs.set(i, "");
+                else
+                    lastMsgs.add("");
+            }
+        }
+        adapter.notifyDataSetChanged();
+    }
+
+
+
 
 
 
@@ -222,14 +252,24 @@ public class ChatsActivity extends ActionBarActivity {
                             c.close();
                         }
                         if(number != null) {
-                            web.add(number);
-                            imageId.add(R.id.icon);
-                            String allchats = prefs.getString(eConstants.PREFS_CHATS, "");
-                            allchats += number + ";" ;
-                            editor = prefs.edit();
-                            editor.putString(eConstants.PREFS_CHATS, allchats);
-                            editor.commit();
-                            adapter.notifyDataSetChanged();
+                            if(web.contains("NO CHATS"))
+                            {
+                                int indx = web.indexOf("NO CHATS");
+                                web.remove(indx);
+                                imageId.remove(indx);
+                                lastMsgs.remove(indx);
+                            }
+                            if(!web.contains(eConstants.getContactByNumber(filterNumber(number)))) {
+                                web.add(eConstants.getContactByNumber(filterNumber(number)));
+                                imageId.add(eConstants.getPpByNumber(filterNumber(number)));
+                                lastMsgs.add("");
+                                String allchats = prefs.getString(eConstants.PREFS_CHATS, "");
+                                allchats += number + ";";
+                                editor.putString(eConstants.PREFS_CHATS, allchats);
+                                editor.commit();
+                                adapter.notifyDataSetChanged();
+                            }
+                            newChat = true;
                             beginChat(filterNumber(number));
                         }
                     }
@@ -241,8 +281,8 @@ public class ChatsActivity extends ActionBarActivity {
 
     private void beginChat(String number)
     {
-        Intent i = new Intent(this, ChatActivity.class);
-        i.putExtra(eConstants.EXTRA_SELF_NUMBER, filterNumber(phoneNumber));
+        activityKilled = true;
+        Intent i = new Intent(ChatsActivity.this, ChatActivity.class);
         if((number.charAt(0) >= '0' && number.charAt(0) <= '9') || number.charAt(0) == '(')
             i.putExtra(eConstants.EXTRA_TARGET_NUMBER, filterNumber(number));
         else
@@ -261,175 +301,179 @@ public class ChatsActivity extends ActionBarActivity {
     }
 
 
-
-    private class MessageRetriever extends AsyncTask<String,Object,String> {
-        @Override
-        protected String doInBackground(String... args){
-                // Create a new HttpClient and Post Header
-                HttpClient httpclient = new DefaultHttpClient();
-                String url = WEB_HOME + "send_post.php";//?from=" + sourceNumber + "&to=" + "0504789654" + "&message=" + "HELLO" + "&time=" + System.currentTimeMillis();
-                HttpPost httppost = new HttpPost(url);
-
-                try {
-                    // Add your data
-                    List<NameValuePair> nameValuePairs = new ArrayList<NameValuePair>(3);
-                    nameValuePairs.add(new BasicNameValuePair("from", sourceNumber));
-                    nameValuePairs.add(new BasicNameValuePair("to", "0504789654"));
-                    nameValuePairs.add(new BasicNameValuePair("message", "HELLO"));
-                  //  nameValuePairs.add(new BasicNameValuePair("time", Long.toString(System.currentTimeMillis())));
-                    httppost.setEntity(new UrlEncodedFormEntity(nameValuePairs));
-
-                    // Execute HTTP Post Request
-                    HttpResponse response = httpclient.execute(httppost);
-                    Log.i("RESPONSE", decodeResponse(response));
-
-                } catch (ClientProtocolException e) {
-
-                } catch (IOException e) {
-
-                }
-            return null;
-        }
-        protected String doInBackgrounds(String... args) {
-            String response = "";
-            String url = WEB_HOME + "getpk.php?user=" + targetNumber;
-            DefaultHttpClient client = new DefaultHttpClient();
-            HttpGet httpGet = new HttpGet(url);
-            try {
-                HttpResponse execute = client.execute(httpGet);
-                InputStream content = execute.getEntity().getContent();
-
-                BufferedReader buffer = new BufferedReader(
-                        new InputStreamReader(content));
-                String s = "";
-                while ((s = buffer.readLine()) != null) {
-                    response += s;
-                }
-
-
-                if (!response.equals("") && response.length() > 5) {
-                    response = decodeHtml(response);
-                    ArrayList<String> newMessages = new ArrayList<String>();
-                    String message = "";
-                    for (int i = 0; i < response.length(); i++) {
-                        if (response.charAt(i) != '\n')
-                            message += response.charAt(i);
-                        else
-                            newMessages.add(message);
-                    }
-                    publishProgress(newMessages.toArray());
-                    Log.i("TAG", "SOMETHING WAS RECEIVED!");
-                }
-                response = "";
-
-
-            } catch (Exception e) {
-                Log.e("ERROR", "EXCEPTION");
-            }
-
-
-            int x = 1;
-            while (x == 1) {
-                Log.e("TAG", "LOOOOOOP");
-                response = "";
-                if (!nextMsg.equals("")) {
-                    url = WEB_HOME + "send.php?from=" + sourceNumber + "&to=" + targetNumber + "&message=" + nextMsg + "&time=" + System.currentTimeMillis();
-                    nextMsg = "";
-                    Log.d("TAG", "Sent a message");
-                } else
-                    url = WEB_HOME + "getmsgs.php?user=" + sourceNumber;
-                client = new DefaultHttpClient();
-                httpGet = new HttpGet(url);
-                try {
-                    HttpResponse execute = client.execute(httpGet);
-                    InputStream content = execute.getEntity().getContent();
-
-                    BufferedReader buffer = new BufferedReader(
-                            new InputStreamReader(content));
-                    String s = "";
-                    while ((s = buffer.readLine()) != null) {
-                        response += s;
-                    }
-
-
-                    if (!response.equals("") && response.length() > 5) {
-                        response = decodeHtml(response);
-                        ArrayList<String> newMessages = new ArrayList<String>();
-                        String message = "";
-                        for (int i = 0; i < response.length(); i++) {
-                            if (response.charAt(i) != '\n')
-                                message += response.charAt(i);
-                            else
-                                newMessages.add(message);
-                        }
-                        publishProgress(newMessages.toArray());
-                        Log.i("TAG", "SOMETHING WAS RECEIVED!");
-                    }
-                    response = "";
-                    Thread.sleep(500);
-
-
-                } catch (Exception e) {
-                    Log.e("ERROR", "EXCEPTION");
-                }
-            }
-
-            Log.i("INFO", "RESPONSE IS: " + response);
-            return decodeHtml(response);
-
-        }
-
-
-
-        private String decodeResponse(HttpResponse httpResponse)
-        {
-            String response = "";
-            try {
-                InputStream content = httpResponse.getEntity().getContent();
-
-                BufferedReader buffer = new BufferedReader(
-                        new InputStreamReader(content));
-                String s = "";
-                while ((s = buffer.readLine()) != null) {
-                    response += s;
-                }
-            }catch (Exception e){
-                e.printStackTrace();
-            }
-            return response;
-        }
-
-
-        public String decodeHtml(String original) {
-            String unfiltered = Html.fromHtml(original).toString();
-            String filtered = "";
-            for (int i = 0; i < unfiltered.length(); i++) {
-                if (i + 5 < unfiltered.length() && unfiltered.substring(i, i + 5).equals("Free "))
-                    break;
-                filtered += unfiltered.charAt(i);
-            }
-            return filtered;
-        }
-
-
-        @Override
-        protected void onProgressUpdate(Object... values) {
-            super.onProgressUpdate(values);
-            String encodedMsg;
-            String decodedMsg;
-            try {
-                for (int i = 0; i < values.length; i++) {
-                    encodedMsg = values[i].toString();
-                    decodedMsg = encodedMsg.substring(1);
-                    if (encodedMsg.charAt(0) == '1')
-                        encrypter.setAESKey(decodedMsg);
-                    else
-                        adapter.postMessage(R.drawable.night_blur, encrypter.AESDecrypt(values[i].toString()));
-                }
-            } catch (Exception e) {
-            }
+    @Override
+    protected void onResume() {
+        super.onResume();
+        activityActive = true;
+        if(activityKilled && !newChat) {
+            activityKilled = false;
+            new mTask2().execute();
+        }else if(newChat){
+            newChat = false;
         }
     }
+
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        activityActive = false;
+    }
+
+    private class mTask2 extends AsyncTask<String, String, String>
+    {
+        @Override
+        protected String doInBackground(String... data) {
+            establishConnection();
+            JSONObject getmsgJson = new JSONObject();
+            String sourceNumber = phoneNumber;
+            try {
+                getmsgJson.put(eConstants.JSON_SERVER_REQTYPE, eConstants.REQTYPE_GETMSG);
+                getmsgJson.put(eConstants.JSON_MSG_FROM, sourceNumber);
+            }catch (JSONException e){
+                Log.e("JSON ERROR", "JSON ERROR");
+                e.printStackTrace();
+            }
+            int x = 0;
+            while(x < 1) {
+                if(activityKilled) {
+                    try {
+                        echoSocket.close();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                    break;
+                }
+                try {
+                    publishProgress("");
+                    PrintWriter out = new PrintWriter(echoSocket.getOutputStream(), true);
+                    BufferedReader in = new BufferedReader(new InputStreamReader(echoSocket.getInputStream()));
+                    out.println(getmsgJson.toString());
+                    String response = in.readLine();
+                    if(!response.equals("0") && response.charAt(0) == '{') {    //NEW MSG RECEIVED
+                        JSONObject msg = new JSONObject(response);
+                        String from = msg.getString(eConstants.JSON_MSG_FROM);
+                        int messageType = msg.getInt(eConstants.JSON_MSG_TYPE);
+                        String message = msg.getString(eConstants.JSON_MSG_CONTENT);
+                        String currentMsgsPrefs = prefs.getString(from + "MSGS", "");
+                        switch (messageType)
+                        {
+                            case eConstants.MSGTYPE_TEXT:
+                                Encrypter encrypter = new Encrypter(prefs.getString(from + "AES", ""));
+                                String decryptedMsg = encrypter.AESDecrypt(message);
+                                msg.put(eConstants.JSON_MSG_CONTENT, decryptedMsg);
+                                currentMsgsPrefs += msg.toString();
+                                editor.putString(from + "MSGS", currentMsgsPrefs);
+                                editor.commit();
+                                if(!web.contains(eConstants.getContactByNumber(from)))
+                                {
+                                    web.add(eConstants.getContactByNumber(from));
+                                    imageId.add(eConstants.getPpByNumber(from));
+                                    lastMsgs.add(decryptedMsg);
+                                    String allchats = prefs.getString(eConstants.PREFS_CHATS, "");
+                                    allchats += from + ";";
+                                    editor.putString(eConstants.PREFS_CHATS, allchats);
+                                    editor.commit();
+                                    publishProgress("NOTIFY");
+                                }
+                                if(!activityActive)
+                                    showNotification(from, decryptedMsg);
+                                playSound();
+                                break;
+                            case eConstants.MSGTYPE_AES:
+                                String privateKey = prefs.getString(eConstants.PREFS_PRIVATE_KEY, "");
+                                String aes = Encrypter.RSADecrypt(message, privateKey);
+                                if(aes.length() == 16) {
+                                    editor.putString(from + "AES", aes);
+                                    editor.commit();
+                                }
+                                break;
+                        }
+                    }
+                    Thread.sleep(150);
+                } catch (IOException e){ //NO CONNECTION
+                    e.printStackTrace();
+                    establishConnection();
+                } catch (JSONException e){
+
+                } catch (Exception e){
+
+                }
+
+            }
+            return null;
+        }
+
+
+        private void establishConnection()
+        {
+            try {
+                echoSocket = new Socket(eConstants.SOCKET_HOST, eConstants.SOCKET_PORT);
+            }catch (IOException e){
+                e.printStackTrace();
+                String[] params = {"TOAST", "CONNECTION ERROR"};
+                try {
+                    Thread.sleep(500);
+                }catch (InterruptedException e1){
+
+                }
+                establishConnection();
+            }finally {
+            }
+        }
+
+        @Override
+        protected void onProgressUpdate(String... msg) {
+            super.onProgressUpdate(msg);
+            if (msg[0].equals("0"))
+                return;
+            else if(msg[0].equals("NOTIFY"))
+                adapter.notifyDataSetChanged();
+            refreshLastMsgs();
+        }
+
+
+
+
+
+
+        public void showNotification(String from, String message){
+            Intent intent = new Intent(ChatsActivity.this, ChatsActivity.class);
+            PendingIntent pIntent = PendingIntent.getActivity(ChatsActivity.this, 0, intent, 0);
+            NotificationCompat.Builder mBuilder =
+                    new NotificationCompat.Builder(ChatsActivity.this)
+                            .setSmallIcon(eConstants.getPpByNumber(from))
+                            .setContentTitle(eConstants.getContactByNumber(from))
+                            .setContentText(message)
+                            .setContentIntent(pIntent);
+            Notification mNotification = mBuilder.build();
+            NotificationManager mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            mNotification.flags |= Notification.FLAG_AUTO_CANCEL;
+            mNotificationManager.notify(0, mNotification);
+        }
+
+
+        private void playSound()
+        {
+            try {
+                Uri notificationSound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+                Ringtone r = RingtoneManager.getRingtone(getApplicationContext(), notificationSound);
+                r.play();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+
+        @Override
+        protected void onPostExecute(String data) {
+        }
+    }
+
+
+
+
+
 
 
 
@@ -455,9 +499,9 @@ public class ChatsActivity extends ActionBarActivity {
                 startActivityForResult(intent, RESULT_CONTACT);
                 break;
             case R.id.action_reset:
-                editor.clear();
-                editor.commit();
-                finish();
+                //getSharedPreferences(eConstants.PREFERENCES_FILE, 0).edit().clear().commit();
+                //finish();
+                break;
         }
         return super.onOptionsItemSelected(item);
     }

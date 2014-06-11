@@ -5,20 +5,33 @@
     android:orientation="horizontal"
     android:background="#FFFFFF"
     android:padding="15dp">
+
         <ImageView
             android:layout_alignParentTop="true"
             android:layout_alignParentLeft="true"
             android:id="@+id/img"
             android:scaleType="centerCrop"
             android:layout_width="60dp"
-            android:layout_height="60dp"/>
+            android:layout_height="60dp"
+            android:src="@drawable/night_blur"/>
+
         <TextView
-            android:text="message"
+            android:text="0502346969"
             android:paddingLeft="10dp"
-            android:id="@+id/txt"
+            android:id="@+id/name_tv"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textSize="20sp"
-            android:layout_centerVertical="true"
+            android:gravity="center"
+            android:textSize="40dp"
+            android:layout_alignParentTop="true"
             android:layout_toRightOf="@+id/img"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentBottom="true"
+            android:layout_toRightOf="@+id/img"
+            android:paddingLeft="20dp"
+            android:text="lastmsg"
+            android:id="@+id/lastmsg_tv" />
 </RelativeLayout>

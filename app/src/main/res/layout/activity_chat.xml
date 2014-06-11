@@ -34,7 +34,7 @@
 		    android:hint="Message"
             android:padding="8dp"
             android:background="@drawable/chat_textbox"
-		    android:inputType="textShortMessage|textCapSentences"/>
+		    android:inputType="textShortMessage|textCapSentences|textAutoCorrect"/>
          </LinearLayout>
 
 		<Button
@@ -42,7 +42,8 @@
             android:layout_gravity="center"
 		    android:layout_width="60dp"
 		    android:layout_height="60dp"
-            android:background="@drawable/btn_layer_list" />
+            android:background="@drawable/btn_layer_list"
+            android:clickable="false" />
 		
 	</LinearLayout>
 

@@ -66,7 +66,7 @@ public class ChatList extends ArrayAdapter<String>{
         }else if(currentImg == drawable2)
             layout.setBackgroundColor(Color.rgb(235, 234, 254));
         if(position > 0 && (Integer) imageId.toArray()[position-1] == currentImg) {
-            times.set(position - 1, "");
+           // times.set(position - 1, "");
         }
         timeTv.setText((String) times.toArray()[position]);
 		txtTitle.setText((String)web.toArray()[position]);

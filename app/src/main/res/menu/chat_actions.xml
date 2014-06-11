@@ -2,7 +2,13 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     tools:context="project.unitato.encrypchat.LoginActivity" >
+
     <item android:id="@+id/action_showaes"
         android:title="Show AES key"
         app:showAsAction="never" />
+
+    <item android:id="@+id/action_delete_history"
+        android:title="Delete history"
+        android:showAsAction="never" />
+
 </menu>

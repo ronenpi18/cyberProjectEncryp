@@ -62,12 +62,13 @@ public class ChatActivity extends Activity{
 	ChatList adapter;
 	Button sendBtn;
     Socket echoSocket;
-    boolean isNewChat;
     boolean needNewAes = false;
     boolean activityKilled = false;
     String nextMsg = "";
+    String partnerPk = "";
     JSONObject nextMsgJson;
     boolean sendMsg = false;
+    boolean activityActive = true;
     String targetNumber;
     String sourceNumber;
     int targetDrawable;
@@ -77,10 +78,13 @@ public class ChatActivity extends Activity{
 	ArrayList<Integer> imageId;
     ArrayList<String> times;
     Encrypter encrypter;
+    String currentMsgsPrefs = "";
+    mTask2 netTask;
 
 	  @Override
 	  protected void onCreate(Bundle savedInstanceState) {
 	    super.onCreate(savedInstanceState);
+          SharedPreferences prefs = getSharedPreferences(eConstants.PREFERENCES_FILE, 0);
           web = new ArrayList<String>();
           imageId = new ArrayList<Integer>();
           times = new ArrayList<String>();
@@ -91,21 +95,17 @@ public class ChatActivity extends Activity{
           msgEt = (EditText) findViewById(R.id.msg_et);
           sendBtn = (Button) findViewById(R.id.button_sendMsg);
           list.setAdapter(adapter);
-          targetNumber = getIntent().getExtras().get(eConstants.EXTRA_TARGET_NUMBER).toString();    //FOR SOME REASON DOESN'T WORK
-          sourceNumber = getIntent().getExtras().get(eConstants.EXTRA_SELF_NUMBER).toString();
-          targetDrawable = R.drawable.night_blur;
-          setTitle(targetNumber);
-          String realnumber = eConstants.getNumberByName(targetNumber);
-          if(realnumber != null) {
-              targetDrawable = eConstants.getPpByNumber(realnumber);
-              targetNumber = realnumber;
-          }
+          targetNumber = getIntent().getExtras().get(eConstants.EXTRA_TARGET_NUMBER).toString();
+          sourceNumber = prefs.getString(eConstants.PREFS_PHONE_NUMEBR, "");
+          targetNumber = eConstants.getNumberByName(targetNumber);
+          targetDrawable = eConstants.getPpByNumber(targetNumber);
+          setTitle(eConstants.getContactByNumber(targetNumber));
           sourceDrawable = eConstants.getPpByNumber(sourceNumber);
           if(sourceDrawable == -1)
               sourceDrawable = R.drawable.icon;
 
 
-          SharedPreferences prefs = getSharedPreferences(eConstants.PREFERENCES_FILE, 0);
+
           nextMsgJson = new JSONObject();
           try {
               nextMsgJson.put(eConstants.JSON_MSG_FROM, sourceNumber);
@@ -117,16 +117,42 @@ public class ChatActivity extends Activity{
           }
           if(prefs.getString(targetNumber + "AES", "").equals(""))
           {
-              isNewChat = true;
               encrypter = new Encrypter();
               SharedPreferences.Editor editor = prefs.edit();
               editor.putString(targetNumber + "AES", encrypter.getAesKey());
               editor.commit();
+              needNewAes = true;
+
           }else{
-              isNewChat = false;
               encrypter = new Encrypter(prefs.getString(targetNumber + "AES", ""));
           }
-          new mTask2().execute();
+          netTask = new mTask2();
+          netTask.execute();
+
+          currentMsgsPrefs = prefs.getString(targetNumber + "MSGS", "");
+          for(int i = 0; i < currentMsgsPrefs.length();)
+          {
+              String currentJson = "";
+              int j;
+              for(j = i; currentMsgsPrefs.charAt(j) != '}'; j++);
+              j+=1;
+              currentJson = currentMsgsPrefs.substring(i,j);
+              try {
+                  JSONObject msgJson = new JSONObject(currentJson);
+                  web.add(msgJson.getString(eConstants.JSON_MSG_CONTENT));
+                  times.add(millis2time(msgJson.getLong(eConstants.JSON_MSG_TIME)));
+                  if(msgJson.getString(eConstants.JSON_MSG_FROM).equals(targetNumber))
+                      imageId.add(targetDrawable);
+                  else
+                      imageId.add(sourceDrawable);
+              }catch (JSONException e){
+                  e.printStackTrace();
+                  Log.e("JSON", "Err reading json in msgs");
+              }
+              i = j;
+          }
+          if(!web.isEmpty())
+            adapter.notifyDataSetChanged();
 
 
 
@@ -147,6 +173,8 @@ public class ChatActivity extends Activity{
 			}
 		});
 
+
+
 	  }
 
 
@@ -154,6 +182,20 @@ public class ChatActivity extends Activity{
     protected void onDestroy() {
         activityKilled = true;
         super.onDestroy();
+    }
+
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        activityActive = true;
+    }
+
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        activityActive = false;
     }
 
     @Override
@@ -211,7 +253,10 @@ public class ChatActivity extends Activity{
             case R.id.action_showaes:
                 AlertDialog.Builder aesDialogBuilder = new AlertDialog.Builder(ChatActivity.this);
                 aesDialogBuilder.setTitle("AES Key");
-                aesDialogBuilder.setMessage(encrypter.getAesKey());
+                if(partnerPk.equals(""))
+                    aesDialogBuilder.setMessage("Conversation AES: " + encrypter.getAesKey());
+                else
+                    aesDialogBuilder.setMessage("Conversation AES:\n" + encrypter.getAesKey() + "\n\n\nPartner public RSA:\n" + partnerPk);
                 aesDialogBuilder.setPositiveButton("Close", new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialogInterface, int i) {
@@ -227,6 +272,14 @@ public class ChatActivity extends Activity{
                 AlertDialog aesDialog = aesDialogBuilder.create();
                 aesDialog.show();
                 break;
+
+            case R.id.action_delete_history:
+                currentMsgsPrefs = "";
+                getSharedPreferences(eConstants.PREFERENCES_FILE, 0).edit().putString(targetNumber + "MSGS", "").commit();
+                web.clear();
+                times.clear();
+                imageId.clear();
+                adapter.notifyDataSetChanged();
         }
         return super.onOptionsItemSelected(item);
     }
@@ -259,40 +312,7 @@ public class ChatActivity extends Activity{
             establishConnection();
             SharedPreferences prefs = getSharedPreferences(eConstants.PREFERENCES_FILE, 0);
             SharedPreferences.Editor editor = prefs.edit();
-            if(isNewChat)
-            {
-                try {
-                    PrintWriter out = new PrintWriter(echoSocket.getOutputStream(), true);
-                    BufferedReader in = new BufferedReader(new InputStreamReader(echoSocket.getInputStream()));
-                    out.println(nextMsgJson.toString());
-                    String prevJson = in.readLine();
-                    if(prevJson.equals("0")) {
-                        nextMsgJson.put(eConstants.JSON_SERVER_REQTYPE, eConstants.REQTYPE_GETPK);
-                        out.println(nextMsgJson.toString());
-                        String pk = in.readLine();
-                        String encryptedAes = Encrypter.RSAEncrypt(encrypter.getAesKey(), pk);
 
-                        nextMsgJson.put(eConstants.JSON_MSG_CONTENT, encryptedAes);
-                        nextMsgJson.put(eConstants.JSON_SERVER_REQTYPE, eConstants.REQTYPE_SENDMSG);
-                        nextMsgJson.put(eConstants.JSON_MSG_TYPE, eConstants.MSGTYPE_AES);
-                        out.println(nextMsgJson.toString());
-                        in.readLine();
-                    }else{
-                        JSONObject prevMsg = new JSONObject(prevJson);
-                        String privateKey = getSharedPreferences(eConstants.PREFERENCES_FILE,0).getString(eConstants.PREFS_PRIVATE_KEY, "");
-                        String aes = Encrypter.RSADecrypt(prevMsg.getString(eConstants.JSON_MSG_CONTENT), privateKey);
-                        encrypter.setAESKey(aes);
-                        editor.putString(targetNumber + "AES", aes);
-                        editor.commit();
-                    }
-
-                    nextMsgJson.put(eConstants.JSON_MSG_CONTENT, "");
-                    nextMsgJson.put(eConstants.JSON_SERVER_REQTYPE, eConstants.REQTYPE_GETMSG);
-                    nextMsgJson.put(eConstants.JSON_MSG_TYPE, eConstants.MSGTYPE_TEXT);
-                }catch (Exception e){
-                    e.printStackTrace();
-                }
-            }
 
 
             int x = 0;
@@ -310,7 +330,11 @@ public class ChatActivity extends Activity{
                     BufferedReader in = new BufferedReader(new InputStreamReader(echoSocket.getInputStream()));
                     out.println(nextMsgJson.toString());
                     if(sendMsg || nextMsgJson.getInt(eConstants.JSON_SERVER_REQTYPE) != eConstants.REQTYPE_GETMSG)
-                    {
+                    {                               //ChatActivity-only
+                        nextMsgJson.put(eConstants.JSON_MSG_CONTENT, encrypter.AESDecrypt(nextMsgJson.getString(eConstants.JSON_MSG_CONTENT)));
+                        currentMsgsPrefs += nextMsgJson.toString();
+                        editor.putString(targetNumber + "MSGS", currentMsgsPrefs);
+                        editor.commit();
                         sendMsg = false;
                         nextMsgJson.put(eConstants.JSON_SERVER_REQTYPE, eConstants.REQTYPE_GETMSG);
                     }
@@ -322,22 +346,49 @@ public class ChatActivity extends Activity{
                         int messageType = msg.getInt(eConstants.JSON_MSG_TYPE);
                         String message = msg.getString(eConstants.JSON_MSG_CONTENT);
                         long time_t = msg.getLong(eConstants.JSON_MSG_TIME);
-                        if(from.equals(targetNumber))
                         switch (messageType)
                         {
                             case eConstants.MSGTYPE_TEXT:
-                                String[] params1 = {encrypter.AESDecrypt(message), millis2time(time_t)};
-                                publishProgress(params1);
+                                playSound();
+                                if(from.equals(targetNumber)) {
+                                    String decryptedMsg = encrypter.AESDecrypt(message);
+                                    String[] params1 = {decryptedMsg, millis2time(time_t)};
+                                    publishProgress(params1);
+                                    msg.put(eConstants.JSON_MSG_CONTENT, decryptedMsg);
+                                    currentMsgsPrefs += msg.toString();
+                                    editor.putString(from + "MSGS", currentMsgsPrefs);
+                                    editor.commit();
+                                    if (!activityActive)
+                                        showNotification(from, decryptedMsg);
+                                }else{
+                                    String decryptedMsg = Encrypter.AESDecrypt(prefs.getString(from+"AES",""),message);
+                                    msg.put(eConstants.JSON_MSG_CONTENT, decryptedMsg);
+                                    String msgsPrefs = prefs.getString(from + "MSGS", "");
+                                    msgsPrefs += msg.toString();
+                                    editor.putString(from + "MSGS", msgsPrefs);
+                                    editor.commit();
+                                    if (!activityActive)
+                                        showNotification(from, decryptedMsg);
+                                }
                                 break;
                             case eConstants.MSGTYPE_AES:
-                                String privateKey = prefs.getString(eConstants.PREFS_PRIVATE_KEY, "");
-                                String aes = Encrypter.RSADecrypt(message, privateKey);
-                                if(aes.length() == 16) {
-                                    encrypter.setAESKey(aes);
-                                    editor.putString(targetNumber + "AES", aes);
-                                    editor.commit();
-                                    String[] params2 = {"TOAST", "AES key updated by partner"};
-                                    publishProgress(params2);
+                                if(from.equals(targetNumber)) {
+                                    String privateKey = prefs.getString(eConstants.PREFS_PRIVATE_KEY, "");
+                                    String aes = Encrypter.RSADecrypt(message, privateKey);
+                                    if (aes.length() == 16) {
+                                        encrypter.setAESKey(aes);
+                                        editor.putString(from + "AES", aes);
+                                        editor.commit();
+                                        String[] params2 = {"TOAST", "AES key updated by partner " + from};
+                                        publishProgress(params2);
+                                    }
+                                }else{
+                                    String privateKey = prefs.getString(eConstants.PREFS_PRIVATE_KEY, "");
+                                    String aes = Encrypter.RSADecrypt(message, privateKey);
+                                    if (aes.length() == 16) {
+                                        editor.putString(from + "AES", aes);
+                                        editor.commit();
+                                    }
                                 }
                                 break;
                         }
@@ -357,6 +408,7 @@ public class ChatActivity extends Activity{
                         nextMsgJson.put(eConstants.JSON_SERVER_REQTYPE, eConstants.REQTYPE_GETPK);
                         out.println(nextMsgJson.toString());
                         String pk = in.readLine();
+                        partnerPk = pk;
                         progressParams[1] = "Encrypting AES key...";
                         publishProgress(progressParams);
                         String encryptedAes = Encrypter.RSAEncrypt(encrypter.getAesKey(), pk);
@@ -433,52 +485,50 @@ public class ChatActivity extends Activity{
             } else if (msg[0].equals("TOAST")) {
                 Toast.makeText(ChatActivity.this, msg[1], Toast.LENGTH_SHORT).show();
             } else if (msg[0].equals("CON_ERR")) {
-                sendBtn.setClickable(false);
+                if(sendBtn.isClickable()) {
+                    sendBtn.setClickable(false);
+                    sendBtn.setAlpha(0.7f);
+                    Toast.makeText(ChatActivity.this, "Connection error", Toast.LENGTH_LONG).show();
+                }
             } else if (msg[0].equals("CON_OK")) {
                 sendBtn.setClickable(true);
+                sendBtn.setAlpha(1f);
             } else if (msg[0].length() > 0 && msg.length == 2) {
-                try {
-                    Uri notification = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
-                    Ringtone r = RingtoneManager.getRingtone(getApplicationContext(), notification);
-                    r.play();
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
+
                 web.add(msg[0]);
                 times.add(msg[1]);
                 imageId.add(targetDrawable);
                 adapter.notifyDataSetChanged();
-                showNotification(targetNumber, msg[0]);
             }
-
-            /*
-            try {
-                JSONObject data = new JSONObject(json[0]);
-                int responseType = data.getInt(eConstants.JSON_SERVER_REQTYPE);
-                int messageType = data.getInt(eConstants.JSON_MSG_TYPE);
-                if(messageType == eConstants.MSGTYPE_TEXT)
-                {
-                    String message = data.getString(eConstants.JSON_MSG_CONTENT);
-                    web.add(encrypter.AESDecrypt(message));
-                    imageId.add(targetDrawable);
-                    adapter.notifyDataSetChanged();
-                }
-            }catch (Exception e){
-                e.printStackTrace();
-            }*/
         }
 
 
 
         public void showNotification(String from, String message){
+            Intent intent = new Intent(ChatActivity.this, ChatsActivity.class);
+            PendingIntent pIntent = PendingIntent.getActivity(ChatActivity.this, 0, intent, 0);
             NotificationCompat.Builder mBuilder =
                     new NotificationCompat.Builder(ChatActivity.this)
-                            .setSmallIcon(R.drawable.icon)
-                            .setContentTitle(from)
-                            .setContentText(message);
-            NotificationManager mNotificationManager =
-                    (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-            mNotificationManager.notify(0, mBuilder.build());
+                            .setSmallIcon(eConstants.getPpByNumber(from))
+                            .setContentTitle(eConstants.getContactByNumber(from))
+                            .setContentText(message)
+                            .setContentIntent(pIntent);
+            Notification mNotification = mBuilder.build();
+            NotificationManager mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            mNotification.flags |= Notification.FLAG_AUTO_CANCEL;
+            mNotificationManager.notify(0, mNotification);
+        }
+
+
+        private void playSound()
+        {
+            try {
+                Uri notificationSound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+                Ringtone r = RingtoneManager.getRingtone(getApplicationContext(), notificationSound);
+                r.play();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
 
 

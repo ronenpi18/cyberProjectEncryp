@@ -14,17 +14,19 @@ import android.widget.TextView;
 public class ChatsList extends ArrayAdapter<String>{
 	private final Activity context;
 	private final ArrayList<String> web;
+    private final ArrayList<String> lastMsgs;
 	private final ArrayList<Integer> imageId;
     private Typeface textTypeface;
     private int textSize;
 	
-	public ChatsList(Activity context, ArrayList<String> web, ArrayList<Integer> imageId, Typeface font, int textSize) {
+	public ChatsList(Activity context, ArrayList<String> web, ArrayList<Integer> imageId, ArrayList<String> lastMsgs, Typeface font, int textSize) {
 			super(context, R.layout.chats_single, web);
 			this.context = context;
             this.textTypeface = font;
             this.textSize= textSize;
 			this.web = web;
 			this.imageId = imageId;
+            this.lastMsgs = lastMsgs;
 			}
 	
 	
@@ -51,8 +53,10 @@ public class ChatsList extends ArrayAdapter<String>{
 	public View getView(int position, View view, ViewGroup parent) {
 		LayoutInflater inflater = context.getLayoutInflater();
 		View rowView= inflater.inflate(R.layout.chats_single, null, true);
-		TextView txtTitle = (TextView) rowView.findViewById(R.id.txt);
+		TextView txtTitle = (TextView) rowView.findViewById(R.id.name_tv);
+        TextView lastMsgTv = (TextView) rowView.findViewById(R.id.lastmsg_tv);
 		ImageView imageView = (ImageView) rowView.findViewById(R.id.img);
+        lastMsgTv.setText((String) lastMsgs.toArray()[position]);
 		txtTitle.setText((String)web.toArray()[position]);
         txtTitle.setTypeface(textTypeface);
         txtTitle.setTextSize(textSize);

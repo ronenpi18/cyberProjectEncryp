@@ -1,6 +1,7 @@
 package project.unitato.encrypchat;
 
 
+import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -44,12 +45,14 @@ public class eConstants {
             put("0508997057", "Denis");
             put("0526226472", "Sean");
             put("0508742277", "Noam");
-            put(null, "Valery");
+            put("0542203329", "Valery");
+            put("0504789654", "Mr. Debug");
+            put("0506789654", "Mrs. Debug");
         }};
         if(numbers.containsKey(number))
             return numbers.get(number);
         else
-            return null;
+            return number;
     }
 
 
@@ -58,14 +61,34 @@ public class eConstants {
             put("0524790022", R.drawable.pp_roman);
             put("0508997057", R.drawable.pp_denis);
             put("0526226472", R.drawable.pp_sean);
-            put("0508742277", -1);
-            put("", -1);
+            put("0508742277", R.drawable.night_blur);
+            put("0542203329", R.drawable.pp_valery);
+            put("0504789654", R.drawable.pp_debug);
+            put("0506789654", R.drawable.icon);
         }};
         if(pics.containsKey(number))
             return pics.get(number);
         else
-            return -1;
+            return R.drawable.night_blur;
     }
+
+
+
+
+    public static String millis2time(long millis){
+        String min, hour;
+        Calendar cal = Calendar.getInstance();
+        cal.setTimeInMillis(millis);
+        min = Integer.toString(cal.get(Calendar.MINUTE));
+        hour = Integer.toString(cal.get(Calendar.HOUR_OF_DAY));
+        if(min.length() == 1)
+            min = "0" + min;
+        if(hour.length() == 1)
+            hour = "0" + hour;
+        return hour + ":" + min;
+    }
+
+
 
 
     public static String getNumberByName(String name){
@@ -75,11 +98,13 @@ public class eConstants {
             put("Denis", "0508997057");
             put("Sean", "0526226472");
             put("Noam", "0508742277");
-            put("Valery", "");
+            put("Valery", "0542203329");
+            put("Mr. Debug", "0504789654");
+            put("Mrs. Debug", "0506789654");
         }};
         if(people.containsKey(name))
             return people.get(name);
         else
-            return null;
+            return name;
     }
 }
