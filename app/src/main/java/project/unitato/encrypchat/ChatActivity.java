@@ -24,6 +24,7 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.Color;
 import android.graphics.Typeface;
 import android.hardware.Camera;
 import android.media.MediaPlayer;
@@ -33,6 +34,7 @@ import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.SystemClock;
+import android.os.Vibrator;
 import android.provider.MediaStore;
 import android.support.v4.app.NotificationCompat;
 import android.support.v4.app.TaskStackBuilder;
@@ -80,6 +82,8 @@ public class ChatActivity extends Activity{
     Encrypter encrypter;
     String currentMsgsPrefs = "";
     mTask2 netTask;
+    Vibrator vibrator;
+    String HASHTAG_STARTER, HASHTAG_ENDER, USERTAG_STARTER, USERTAG_ENDER;
 
 	  @Override
 	  protected void onCreate(Bundle savedInstanceState) {
@@ -103,9 +107,8 @@ public class ChatActivity extends Activity{
           sourceDrawable = eConstants.getPpByNumber(sourceNumber);
           if(sourceDrawable == -1)
               sourceDrawable = R.drawable.icon;
-
-
-
+          msgEt.setTypeface(msgTypeface);
+          vibrator = (Vibrator) this.getSystemService(Context.VIBRATOR_SERVICE);
           nextMsgJson = new JSONObject();
           try {
               nextMsgJson.put(eConstants.JSON_MSG_FROM, sourceNumber);
@@ -172,9 +175,11 @@ public class ChatActivity extends Activity{
                 sendMsg();
 			}
 		});
-
-
-
+          
+        USERTAG_STARTER = prefs.getString(eConstants.PREFS_SOCIAL_USERTAG_STARTER, eConstants.USERTAG_TWITTER_STARTER);
+        USERTAG_ENDER = prefs.getString(eConstants.PREFS_SOCIAL_USERTAG_ENDER, eConstants.USERTAG_TWITTER_ENDER);
+        HASHTAG_STARTER = prefs.getString(eConstants.PREFS_SOCIAL_HASHTAG_STARTER, eConstants.HASHTAG_TWITTER_STARTER);
+        HASHTAG_ENDER = prefs.getString(eConstants.PREFS_SOCIAL_HASHTAG_ENDER, eConstants.HASHTAG_TWITTER_ENDER);
 	  }
 
 
@@ -201,14 +206,11 @@ public class ChatActivity extends Activity{
     @Override
     public void finish(){
         super.finish();
-        overridePendingTransition(R.anim.activity_enter_r2l, R.anim.activity_leave_r2l);
     }
 
 
     @Override
     public boolean onKeyUp(int keyCode, KeyEvent event) {
-        if(keyCode == KeyEvent.KEYCODE_ENTER)
-            sendMsg();
         return super.onKeyUp(keyCode, event);
     }
 
@@ -216,18 +218,89 @@ public class ChatActivity extends Activity{
         String message = msgEt.getText().toString();
         if(message.length() == 0)
             return;
-        web.add(message);
         imageId.add(sourceDrawable);
         Calendar calendar = Calendar.getInstance();
         times.add(millis2time(calendar.getTimeInMillis()));
         adapter.notifyDataSetChanged();
+        if(message.length() < 6 || !message.substring(0, 6).equals("<html>")) {
+            message = message.replaceAll("\n", "<br>");
+            boolean encountered = false;
+            for (int i = 0; i < message.length(); i++) {
+                if (message.charAt(i) == '*') {
+                    if (encountered)
+                        message = message.replaceFirst("\\*", "</b>");
+                    else
+                        message = message.replaceFirst("\\*", "<b>");
+                    encountered = !encountered;
+                } else if (message.charAt(i) == '@') {
+                    if (i == 0 || message.charAt(i - 1) == ' ') {
+                        int j;
+                        for (j = i; j < message.length() && message.charAt(j) != ' '; j++) ;
+                        String facebookUser = message.substring(i + 1, j);
+                        String replacement = "<a href=\"" + USERTAG_STARTER + facebookUser + USERTAG_ENDER + "\">@" + facebookUser + "</a>";
+                        message = message.substring(0, i) + replacement + message.substring(i + facebookUser.length() + 1);
+                        i += replacement.length();
+                    } else if (i > 0 && message.charAt(i - 1) != ' ') {
+                        int j1, j2;
+                        boolean encounteredDot = false;
+                        for (j1 = i; j1 >= 0 && message.charAt(j1) != ' '; j1--) ;
+                        for (j2 = i; j2 < message.length() && message.charAt(j2) != ' '; j2++)
+                            if (message.charAt(j2) == '.')
+                                encounteredDot = true;
+                        if (encounteredDot) {
+                            j1++;
+                            String email = message.substring(j1, j2);
+                            String replacement = "<a href=\"mailto:" + email + "\">" + email + "</a>";
+                            message = message.substring(0, j1) + replacement + message.substring(j2);
+                            i = j1 + replacement.length();
+                        } else if (message.substring(i + 1, j2).toLowerCase().equals("gmail")) {
+                            j1++;
+                            String email = message.substring(j1, j2) + ".com";
+                            String replacement = "<a href=\"mailto:" + email + "\">" + email + "</a>";
+                            message = message.substring(0, j1) + replacement + message.substring(j2);
+                            i = j1 + replacement.length();
+                        }
+                    }
+                } else if (message.charAt(i) == '#' && (i == 0 || message.charAt(i - 1) == ' ')) {
+                    int j;
+                    for (j = i; j < message.length() && message.charAt(j) != ' '; j++) ;
+                    String hashtag = message.substring(i + 1, j);
+                    String replacement = "<a href=\"" + HASHTAG_STARTER + hashtag + HASHTAG_ENDER + "\">#" + hashtag + "</a>";
+                    message = message.substring(0, i) + replacement + message.substring(i + hashtag.length() + 1);
+                    i += replacement.length();
+                } else if ((i < message.length() - 7 && message.substring(i, i + 7).equals("http://")) || (i < message.length() - 8 && message.substring(i, i + 8).equals("https://"))) {
+                    int startIndx = i;
+                    int endIndx;
+                    for (endIndx = startIndx; endIndx < message.length() && message.charAt(endIndx) != ' '; endIndx++)
+                        ;
+                    String url = message.substring(startIndx, endIndx);
+                    String replacement = "<a href=\"" + url + "\">" + url + "</a>";
+                    message = message.substring(0, i) + replacement + message.substring(i + url.length());
+                    i += replacement.length();
+                } else if (i < message.length() - 3 && message.charAt(i) == '.' && message.charAt(i + 1) != ' ') {
+                    if (message.substring(i, i + 4).equals(".com")
+                            || message.substring(i, i + 3).equals(".co")
+                            || message.substring(i, i + 4).equals(".org")
+                            || message.substring(i, i + 4).equals(".net")
+                            || message.substring(i, i + 4).equals(".gov")) {
+                        int j1, j2;
+                        for (j1 = i; j1 >= 0 && message.charAt(j1) != ' '; j1--) ;
+                        for (j2 = i; j2 < message.length() && message.charAt(j2) != ' '; j2++) ;
+                        j1++;
+                        String url2replace = message.substring(j1, j2);
+                        String replacement = "<a href=\"http://" + url2replace + "\">" + url2replace + "</a>";
+                        message = message.substring(0, j1) + replacement + message.substring(j2);
+                        i = j1 + replacement.length();
+                        Log.i("", "");
+                    }
+                }
+            }
+        }
+        web.add(message);
         String encryptedMessage = encrypter.AESEncrypt(message);
-        // WebSigner webSigner = new WebSigner();
-        // webSigner.execute(WEB_HOME + "send.php?from=" + sourceNumber + "&to=" + targetNumber + "&message=" + encryptedMessage + "&time=" + System.currentTimeMillis());
-        //nextMsg = "0" + encryptedMessage;
-        nextMsg = msgEt.getText().toString();
+        nextMsg = message;
         try {
-            nextMsgJson.put(eConstants.JSON_MSG_CONTENT, encrypter.AESEncrypt(nextMsg));
+            nextMsgJson.put(eConstants.JSON_MSG_CONTENT, encryptedMessage);
             nextMsgJson.put(eConstants.JSON_MSG_TYPE, eConstants.MSGTYPE_TEXT);
             nextMsgJson.put(eConstants.JSON_SERVER_REQTYPE, eConstants.REQTYPE_SENDMSG);
             nextMsgJson.put(eConstants.JSON_MSG_TIME, calendar.getTimeInMillis());
@@ -312,7 +385,16 @@ public class ChatActivity extends Activity{
             establishConnection();
             SharedPreferences prefs = getSharedPreferences(eConstants.PREFERENCES_FILE, 0);
             SharedPreferences.Editor editor = prefs.edit();
-
+            ArrayList<String> allnums = new ArrayList<String>();
+            String allnumsStr = prefs.getString(eConstants.PREFS_CHATS, "");
+            String number = "";
+            for(int i = 0; i < allnumsStr.length(); i++) {
+                if (allnumsStr.charAt(i) == ';') {
+                    allnums.add(ChatsActivity.filterNumber(number));
+                    number = "";
+                } else
+                    number += allnumsStr.charAt(i);
+            }
 
 
             int x = 0;
@@ -349,7 +431,10 @@ public class ChatActivity extends Activity{
                         switch (messageType)
                         {
                             case eConstants.MSGTYPE_TEXT:
-                                playSound();
+                                if(prefs.getBoolean(eConstants.PREFS_SOUND, true))
+                                    playSound();
+                                if(prefs.getBoolean(eConstants.PREFS_VIBRATION, true))
+                                    vibrator.vibrate(20);
                                 if(from.equals(targetNumber)) {
                                     String decryptedMsg = encrypter.AESDecrypt(message);
                                     String[] params1 = {decryptedMsg, millis2time(time_t)};
@@ -361,6 +446,13 @@ public class ChatActivity extends Activity{
                                     if (!activityActive)
                                         showNotification(from, decryptedMsg);
                                 }else{
+                                    if(!allnums.contains(from))
+                                    {
+                                        allnums.add(from);
+                                        allnumsStr += from + ";";
+                                        editor.putString(eConstants.PREFS_CHATS, allnumsStr);
+                                        editor.commit();
+                                    }
                                     String decryptedMsg = Encrypter.AESDecrypt(prefs.getString(from+"AES",""),message);
                                     msg.put(eConstants.JSON_MSG_CONTENT, decryptedMsg);
                                     String msgsPrefs = prefs.getString(from + "MSGS", "");
@@ -511,7 +603,7 @@ public class ChatActivity extends Activity{
                     new NotificationCompat.Builder(ChatActivity.this)
                             .setSmallIcon(eConstants.getPpByNumber(from))
                             .setContentTitle(eConstants.getContactByNumber(from))
-                            .setContentText(message)
+                            .setContentText(Html.fromHtml(message))
                             .setContentIntent(pIntent);
             Notification mNotification = mBuilder.build();
             NotificationManager mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);

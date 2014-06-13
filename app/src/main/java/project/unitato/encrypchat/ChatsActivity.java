@@ -14,9 +14,11 @@ import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Vibrator;
 import android.provider.ContactsContract;
 import android.support.v4.app.NotificationCompat;
 import android.support.v7.app.ActionBarActivity;
+import android.text.Html;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.Menu;
@@ -48,6 +50,7 @@ public class ChatsActivity extends ActionBarActivity {
     String phoneNumber;
     int RESULT_LOGIN = 0;
     int RESULT_CONTACT = 1;
+    Vibrator vibrator;
     ListView list;
     ChatsList adapter;
     SharedPreferences prefs;
@@ -78,7 +81,7 @@ public class ChatsActivity extends ActionBarActivity {
             new mTask2().execute();
         }
 
-
+        vibrator = (Vibrator) this.getSystemService(Context.VIBRATOR_SERVICE);
 
         web = new ArrayList<String>();
         imageId = new ArrayList<Integer>();
@@ -194,6 +197,12 @@ public class ChatsActivity extends ActionBarActivity {
 
     private void refreshLastMsgs()
     {
+        if(web.contains("NO CHATS") && web.size() > 1)
+        {
+            web.remove(0);
+            imageId.remove(0);
+            lastMsgs.remove(0);
+        }
         for(int i = 0; i < web.size(); i++)
         {
             String allmsgs = prefs.getString(eConstants.getNumberByName((String)web.toArray()[i]) + "MSGS", "");
@@ -232,7 +241,7 @@ public class ChatsActivity extends ActionBarActivity {
             phoneNumber = data.getExtras().getString(eConstants.PREFS_PHONE_NUMEBR);
             editor.putString(eConstants.PREFS_PHONE_NUMEBR, phoneNumber);
             editor.commit();
-            setTitle(phoneNumber.substring(0, 3) + "-" + phoneNumber.substring(3, 6) + "-" + phoneNumber.substring(6));
+            new mTask2().execute();
         }else if(requestCode == RESULT_CONTACT){
             if (resultCode == Activity.RESULT_OK) {
                 Uri uri = data.getData();
@@ -260,8 +269,9 @@ public class ChatsActivity extends ActionBarActivity {
                                 lastMsgs.remove(indx);
                             }
                             if(!web.contains(eConstants.getContactByNumber(filterNumber(number)))) {
-                                web.add(eConstants.getContactByNumber(filterNumber(number)));
-                                imageId.add(eConstants.getPpByNumber(filterNumber(number)));
+                                number = filterNumber(number);
+                                web.add(eConstants.getContactByNumber(number));
+                                imageId.add(eConstants.getPpByNumber(number));
                                 lastMsgs.add("");
                                 String allchats = prefs.getString(eConstants.PREFS_CHATS, "");
                                 allchats += number + ";";
@@ -297,6 +307,8 @@ public class ChatsActivity extends ActionBarActivity {
         for(int i = 0; i < number.length(); i++)
             if(number.charAt(i) <= '9' && number.charAt(i) >= '0')
                 filteredNumber += number.charAt(i);
+        if(filteredNumber.charAt(0) == '0')
+            filteredNumber = "972" + filteredNumber.substring(1);
         return filteredNumber;
     }
 
@@ -304,10 +316,37 @@ public class ChatsActivity extends ActionBarActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        if(activityKilled)
+            overridePendingTransition(R.anim.activity_enter_r2l, R.anim.activity_leave_r2l);
         activityActive = true;
         if(activityKilled && !newChat) {
             activityKilled = false;
             new mTask2().execute();
+            String allnumsStr = prefs.getString(eConstants.PREFS_CHATS, "");
+            String number = "";
+            for(int i = 0; i < allnumsStr.length(); i++) {
+                if (allnumsStr.charAt(i) == ';') {
+                    if(!web.contains(eConstants.getContactByNumber(number))) {
+                        web.add(eConstants.getContactByNumber(number));
+                        imageId.add(eConstants.getPpByNumber(number));
+                        String allmsgs = prefs.getString(number + "MSGS", "");
+                        if(allmsgs.length() > 0) {
+                            int j;
+                            for (j = allmsgs.length() - 1; allmsgs.charAt(j) != '{'; j--) ;
+                            try {
+                                JSONObject lastMsgJson = new JSONObject(allmsgs.substring(j));
+                                lastMsgs.add(lastMsgJson.getString(eConstants.JSON_MSG_CONTENT));
+                            } catch (JSONException e) {
+                                e.printStackTrace();
+                            }
+                        }else{
+                            lastMsgs.add("");
+                        }
+                    }
+                    number = "";
+                } else
+                    number += allnumsStr.charAt(i);
+            }
         }else if(newChat){
             newChat = false;
         }
@@ -378,7 +417,10 @@ public class ChatsActivity extends ActionBarActivity {
                                 }
                                 if(!activityActive)
                                     showNotification(from, decryptedMsg);
-                                playSound();
+                                if(prefs.getBoolean(eConstants.PREFS_SOUND, true))
+                                    playSound();
+                                if(prefs.getBoolean(eConstants.PREFS_VIBRATION, true))
+                                    vibrator.vibrate(20);
                                 break;
                             case eConstants.MSGTYPE_AES:
                                 String privateKey = prefs.getString(eConstants.PREFS_PRIVATE_KEY, "");
@@ -444,7 +486,7 @@ public class ChatsActivity extends ActionBarActivity {
                     new NotificationCompat.Builder(ChatsActivity.this)
                             .setSmallIcon(eConstants.getPpByNumber(from))
                             .setContentTitle(eConstants.getContactByNumber(from))
-                            .setContentText(message)
+                            .setContentText(Html.fromHtml(message))
                             .setContentIntent(pIntent);
             Notification mNotification = mBuilder.build();
             NotificationManager mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
@@ -499,8 +541,12 @@ public class ChatsActivity extends ActionBarActivity {
                 startActivityForResult(intent, RESULT_CONTACT);
                 break;
             case R.id.action_reset:
-                //getSharedPreferences(eConstants.PREFERENCES_FILE, 0).edit().clear().commit();
-                //finish();
+                getSharedPreferences(eConstants.PREFERENCES_FILE, 0).edit().putString(eConstants.PREFS_PHONE_NUMEBR, "").commit();
+                finish();
+                break;
+            case R.id.action_settings:
+                Intent i = new Intent(ChatsActivity.this, SettingsActivity.class);
+                startActivity(i);
                 break;
         }
         return super.onOptionsItemSelected(item);

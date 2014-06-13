@@ -127,9 +127,8 @@ public class LoginActivity extends ActionBarActivity {
                     phoneNumber = numEt.getText().toString();
                     if(isValidPhone(phoneNumber))
                     {
-
-                        //WebSigner webSigner = new WebSigner();
-                        //webSigner.execute(ChatActivity.WEB_HOME + "register-denis.php/?user=" + phoneNumber + "&pk=");
+                        if(phoneNumber.charAt(0) == '0')
+                            phoneNumber = "972" + phoneNumber.substring(1);
                         new mTask2().execute(phoneNumber);
                     }
                 }

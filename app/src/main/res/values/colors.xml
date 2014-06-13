@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color
+        name="action_bar">#ffdb7500</color>
+
+    <color
+        name="chat_bottom">#ff39caff</color>
+</resources>

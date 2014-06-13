@@ -1,0 +1,183 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_height="match_parent"
+    android:layout_width="match_parent"
+    android:orientation="vertical"
+    android:padding="20dp"
+    android:background="@android:color/white" >
+
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:paddingBottom="15dp"
+        android:paddingRight="15dp"
+        android:paddingLeft="15dp"
+        android:paddingTop="15dp"
+        tools:context="project.unitato.encrypchat.SettingsActivity"
+        android:orientation="vertical" >
+
+        <TextView
+            android:id="@+id/design_settings_notifications_tv"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Notifications:"
+            android:layout_gravity="center"
+            android:textSize="40dp" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center" >
+
+            <CheckBox
+                android:id="@+id/checkbox_sound"
+                android:text="Sound"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+
+            <CheckBox
+                android:id="@+id/checkbox_vibration"
+                android:text="Vibration"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+
+
+
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:orientation="vertical" >
+
+
+        <TextView
+            android:id="@+id/design_settings_social_tv"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Social Networks:"
+            android:layout_gravity="center"
+            android:textSize="40dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_gravity="center" >
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:layout_weight="1" >
+
+                <TextView
+                    android:id="@+id/design_settings_usertag_tv"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="\@user"
+                    android:textSize="30dp"/>
+
+                <RadioGroup
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:id="@+id/settings_usertag_radiogroup" >
+
+
+                    <RadioButton
+                        android:id="@+id/rb_facebook_user"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Facebook"/>
+
+                    <RadioButton
+                        android:id="@+id/rb_twitter_user"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Twitter"/>
+
+                    <RadioButton
+                        android:id="@+id/rb_youtube_user"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="YouTube"/>
+
+
+                    <RadioButton
+                        android:id="@+id/rb_tumblr_user"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Tumblr"/>
+
+                    </RadioGroup>
+
+            </LinearLayout>
+
+
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_weight="1"
+                android:gravity="center">
+
+                <TextView
+                    android:id="@+id/design_settings_hashtag_tv"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="#hashtag"
+                    android:textSize="30dp"/>
+
+                <RadioGroup
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:id="@+id/settings_hashtag_radiogroup">
+
+
+                    <RadioButton
+                        android:id="@+id/rb_facebook_hashtag"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Facebook"/>
+
+                    <RadioButton
+                        android:id="@+id/rb_twitter_hashtag"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Twitter"/>
+
+                    <RadioButton
+                        android:id="@+id/rb_googleplus_hashtag"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Google+"/>
+
+                    <RadioButton
+                        android:id="@+id/rb_tumblr_hashtag"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Tumblr"/>
+
+                </RadioGroup>
+
+            </LinearLayout>
+
+
+
+        </LinearLayout>
+
+
+    </LinearLayout>
+
+
+</LinearLayout>

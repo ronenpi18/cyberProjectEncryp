@@ -29,7 +29,8 @@
         android:background="@drawable/login_textbox"
         android:layout_centerVertical="true"
         android:layout_centerHorizontal="true"
-        android:id="@+id/login_num_et" />
+        android:id="@+id/login_num_et"
+        android:hint="Phone number"/>
 
     <TextView
         android:layout_width="wrap_content"

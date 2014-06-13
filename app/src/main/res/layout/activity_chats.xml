@@ -12,8 +12,7 @@
         android:dividerHeight="10.0sp"
 		android:layout_width="match_parent" 
 		android:layout_height="match_parent"
-		android:layout_weight="200"
-		android:transcriptMode="alwaysScroll" >
+		android:layout_weight="200" >
 	</ListView>
 
 

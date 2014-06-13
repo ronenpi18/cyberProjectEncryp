@@ -7,15 +7,15 @@
     android:id="@+id/chat_single_layout"
     android:paddingLeft="15dp"
     android:paddingRight="15dp"
-    android:paddingTop="15dp"
-    android:paddingBottom="15dp">
+    android:paddingTop="5dp"
+    android:paddingBottom="5dp">
         <ImageView
             android:layout_alignParentTop="true"
             android:layout_alignParentLeft="true"
             android:id="@+id/img"
             android:scaleType="centerCrop"
-            android:layout_width="60dp"
-            android:layout_height="60dp"/>
+            android:layout_width="50dp"
+            android:layout_height="50dp"/>
         <TextView
             android:text="message"
             android:paddingLeft="10dp"
@@ -29,10 +29,13 @@
         <TextView
             android:id="@+id/time_tv"
             android:text="23:04"
-            android:padding="5dp"
+            android:paddingRight="5dp"
+            android:paddingBottom="5dp"
+            android:paddingTop="1dp"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:textSize="14sp"
+            android:layout_below="@+id/txt"
             android:layout_alignParentBottom="true"
             android:layout_alignParentRight="true" />
 </RelativeLayout>

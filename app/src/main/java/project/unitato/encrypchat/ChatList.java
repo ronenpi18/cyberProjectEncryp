@@ -6,6 +6,8 @@ import java.util.ArrayList;
 import android.app.Activity;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.text.Html;
+import android.text.method.LinkMovementMethod;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -65,16 +67,50 @@ public class ChatList extends ArrayAdapter<String>{
             layout.setBackgroundColor(Color.rgb(235, 234, 254));
         }else if(currentImg == drawable2)
             layout.setBackgroundColor(Color.rgb(235, 234, 254));
-        if(position > 0 && (Integer) imageId.toArray()[position-1] == currentImg) {
-           // times.set(position - 1, "");
-        }
+
         timeTv.setText((String) times.toArray()[position]);
-		txtTitle.setText((String)web.toArray()[position]);
+        if(times.toArray()[position].equals(""))
+            timeTv.setVisibility(View.GONE);
         txtTitle.setTypeface(textTypeface);
-        txtTitle.setTextSize(25);
+        String message = (String) web.toArray()[position];
+        txtTitle.setText(Html.fromHtml(message));
+        txtTitle.setMovementMethod(LinkMovementMethod.getInstance());
 		imageView.setImageResource(currentImg);
+        if(position > 0 && (Integer) imageId.toArray()[position-1] == currentImg) {
+            imageView.setVisibility(View.GONE);
+        }
+        if(position < times.size() - 1 && (Integer) imageId.toArray()[position+1] == currentImg && times.get(position+1).substring(0,2).equals(times.get(position).substring(0,2)) && Integer.parseInt(times.get(position+1).substring(3,5)) - Integer.parseInt(times.get(position).substring(3,5)) < 15){
+            timeTv.setVisibility(View.GONE);
+        }
+
+
 		return rowView;
 	}
+
+
+
+
+    String replaceCoorelation(String msg, String newWord)
+    {
+        for(int i = 0; i < msg.length(); i++)
+        {
+            int j;
+            for(j = i; j < msg.length() && msg.charAt(j) != ' '; j++);
+            String word = msg.substring(i, j);
+            int coorelations = 0;
+            for(int x = 0; x < word.length() && x < newWord.length(); x++)
+            {
+                if(word.charAt(x) != newWord.charAt(x))
+                    coorelations++;
+            }
+            if(coorelations == 1)
+            {
+                msg = msg.replace(word, newWord);
+            }
+            i  = j;
+        }
+        return  msg;
+    }
 	
 	
 	

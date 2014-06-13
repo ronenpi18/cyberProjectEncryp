@@ -4,6 +4,7 @@ import java.util.ArrayList;
 
 import android.app.Activity;
 import android.graphics.Typeface;
+import android.text.Html;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -56,7 +57,18 @@ public class ChatsList extends ArrayAdapter<String>{
 		TextView txtTitle = (TextView) rowView.findViewById(R.id.name_tv);
         TextView lastMsgTv = (TextView) rowView.findViewById(R.id.lastmsg_tv);
 		ImageView imageView = (ImageView) rowView.findViewById(R.id.img);
-        lastMsgTv.setText((String) lastMsgs.toArray()[position]);
+        String message =  (String) lastMsgs.toArray()[position];
+        boolean encountered = false;
+        for(int i = 0; i < message.length(); i++)
+            if(message.charAt(i) == '*')
+            {
+                if(encountered)
+                    message = message.replaceFirst("\\*", "</b>");
+                else
+                    message = message.replaceFirst("\\*", "<b>");
+                encountered = !encountered;
+            }
+        lastMsgTv.setText(Html.fromHtml(message));
 		txtTitle.setText((String)web.toArray()[position]);
         txtTitle.setTypeface(textTypeface);
         txtTitle.setTextSize(textSize);
