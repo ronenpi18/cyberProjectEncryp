@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#FFFFFF">
+
+
+    <android.support.v4.view.ViewPager
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_weight="200"
+        android:id="@+id/pager" />
+
+
+
+    <LinearLayout
+
+
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="@color/chat_bottom">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:padding="10dp" >
+            <EditText
+                android:id="@+id/msg_et"
+                android:layout_width="0dip"
+                android:layout_height="wrap_content"
+                android:minHeight="40dp"
+                android:layout_weight="1"
+                android:hint="Message"
+                android:paddingTop="8dp"
+                android:paddingBottom="8dp"
+                android:paddingLeft="15dp"
+                android:paddingRight="15dp"
+                android:background="@drawable/chat_textbox"
+                android:inputType="textMultiLine|textCapSentences|textAutoCorrect"/>
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/button_sendMsg"
+            android:layout_gravity="bottom"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:background="@drawable/btn_layer_list"
+            android:clickable="false"/>
+
+    </LinearLayout>
+
+</LinearLayout>

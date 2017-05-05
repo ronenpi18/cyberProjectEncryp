@@ -45,7 +45,6 @@ import java.util.ArrayList;
 
 public class ChatsActivity extends ActionBarActivity {
 
-
     private Socket socket;
     String phoneNumber;
     int RESULT_LOGIN = 0;
@@ -68,8 +67,8 @@ public class ChatsActivity extends ActionBarActivity {
         super.onCreate(savedInstanceState);
         prefs = getSharedPreferences(eConstants.PREFERENCES_FILE, 0);
         editor = prefs.edit();
-
-        //Check if user registered yet
+        Encrypter.startSampleTransmission();
+        //Check if user haven't registered yet
         if(prefs.getString(eConstants.PREFS_PHONE_NUMEBR, "").equals(""))
         {
             Intent i = new Intent(this, LoginActivity.class);
@@ -92,6 +91,7 @@ public class ChatsActivity extends ActionBarActivity {
             web.add("NO CHATS");
             imageId.add(R.drawable.night_blur);
             lastMsgs.add("Tap '+'");
+
         }else{
             String data = prefs.getString(eConstants.PREFS_CHATS, "");
             String number = "";
@@ -194,7 +194,9 @@ public class ChatsActivity extends ActionBarActivity {
     }
 
 
-
+    /**
+     * Refresher
+     */
     private void refreshLastMsgs()
     {
         if(web.contains("NO CHATS") && web.size() > 1)
@@ -228,12 +230,12 @@ public class ChatsActivity extends ActionBarActivity {
         adapter.notifyDataSetChanged();
     }
 
-
-
-
-
-
-
+    /**
+     * checks the result of login && result of contacts
+     * @param requestCode
+     * @param resultCode
+     * @param data
+     */
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
@@ -242,6 +244,8 @@ public class ChatsActivity extends ActionBarActivity {
             editor.putString(eConstants.PREFS_PHONE_NUMEBR, phoneNumber);
             editor.commit();
             new mTask2().execute();
+            Intent i2 = new Intent(ChatsActivity.this, HelpActivity.class);
+            startActivity(i2);
         }else if(requestCode == RESULT_CONTACT){
             if (resultCode == Activity.RESULT_OK) {
                 Uri uri = data.getData();
@@ -274,7 +278,7 @@ public class ChatsActivity extends ActionBarActivity {
                                 imageId.add(eConstants.getPpByNumber(number));
                                 lastMsgs.add("");
                                 String allchats = prefs.getString(eConstants.PREFS_CHATS, "");
-                                allchats += number + ";";
+                                allchats += filterNumber(number) + ";";
                                 editor.putString(eConstants.PREFS_CHATS, allchats);
                                 editor.commit();
                                 adapter.notifyDataSetChanged();
@@ -359,6 +363,9 @@ public class ChatsActivity extends ActionBarActivity {
         activityActive = false;
     }
 
+    /**
+     * Async task which interacts with the server
+     */
     private class mTask2 extends AsyncTask<String, String, String>
     {
         @Override
@@ -446,7 +453,9 @@ public class ChatsActivity extends ActionBarActivity {
             return null;
         }
 
-
+        /**
+         * Socket opener and establisher
+         */
         private void establishConnection()
         {
             try {
@@ -474,11 +483,11 @@ public class ChatsActivity extends ActionBarActivity {
             refreshLastMsgs();
         }
 
-
-
-
-
-
+        /**
+         * Sets the notifications for incoming msgs
+         * @param from
+         * @param message
+         */
         public void showNotification(String from, String message){
             Intent intent = new Intent(ChatsActivity.this, ChatsActivity.class);
             PendingIntent pIntent = PendingIntent.getActivity(ChatsActivity.this, 0, intent, 0);
@@ -493,7 +502,6 @@ public class ChatsActivity extends ActionBarActivity {
             mNotification.flags |= Notification.FLAG_AUTO_CANCEL;
             mNotificationManager.notify(0, mNotification);
         }
-
 
         private void playSound()
         {
@@ -545,8 +553,12 @@ public class ChatsActivity extends ActionBarActivity {
                 finish();
                 break;
             case R.id.action_settings:
-                Intent i = new Intent(ChatsActivity.this, SettingsActivity.class);
-                startActivity(i);
+                Intent i1 = new Intent(ChatsActivity.this, SettingsActivity.class);
+                startActivity(i1);
+                break;
+            case R.id.action_help:
+                Intent i2 = new Intent(ChatsActivity.this, HelpActivity.class);
+                startActivity(i2);
                 break;
         }
         return super.onOptionsItemSelected(item);

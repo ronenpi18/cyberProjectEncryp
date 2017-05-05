@@ -9,7 +9,7 @@
     android:paddingRight="15dp"
     android:paddingTop="5dp"
     android:paddingBottom="5dp">
-        <ImageView
+        <project.unitato.encrypchat.RoundedImageView
             android:layout_alignParentTop="true"
             android:layout_alignParentLeft="true"
             android:id="@+id/img"

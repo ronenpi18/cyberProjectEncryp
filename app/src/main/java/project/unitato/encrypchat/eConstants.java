@@ -10,8 +10,11 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class eConstants {
-    public static final String SOCKET_HOST = "31.220.49.240";
-    public static final int SOCKET_PORT = 47395;
+    public static final String SOCKET_HOST_ = "31.220.49.240";
+    public static final int SOCKET_PORT_ = 47395;
+    public static final String SOCKET_HOST = "192.168.14.71";
+    public static final int SOCKET_PORT = 6960;
+
 
     public static final String JSON_SERVER_REQTYPE = "reqtype";
     public static final String JSON_MSG_TYPE = "type";
@@ -72,7 +75,7 @@ public class eConstants {
         Map<String, String> numbers = new HashMap<String, String>(){{ //TODO
             put("972524790022", "Roman");
             put("972508997057", "Denis");
-            put("972526226472", "Sean");
+            put("972528136894", "Ronen");
             put("972508742277", "Noam");
             put("972542203329", "Valery");
             put("972504789654", "Mr. Debug");
@@ -89,7 +92,7 @@ public class eConstants {
         Map<String, Integer> pics = new HashMap<String, Integer>() {{ //TODO
             put("972524790022", R.drawable.pp_roman);
             put("972508997057", R.drawable.pp_denis);
-            put("972526226472", R.drawable.pp_sean);
+            put("972528136894", R.drawable.pp_ronen);
             put("972508742277", R.drawable.night_blur);
             put("972542203329", R.drawable.pp_valery);
             put("972504789654", R.drawable.pp_debug);

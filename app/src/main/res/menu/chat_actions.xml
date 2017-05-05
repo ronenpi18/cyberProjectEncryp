@@ -11,4 +11,8 @@
         android:title="Delete history"
         android:showAsAction="never" />
 
+    <item android:id="@+id/action_help"
+        android:title="Help"
+        android:showAsAction="never"/>
+
 </menu>

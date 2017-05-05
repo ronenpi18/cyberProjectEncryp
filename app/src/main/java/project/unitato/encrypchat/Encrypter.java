@@ -14,10 +14,12 @@ import java.security.SecureRandom;
 import java.security.spec.EncodedKeySpec;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
+import java.util.NoSuchElementException;
 import java.util.Random;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
@@ -155,7 +157,7 @@ public class Encrypter {
 	
 	
 	
-	public static void SampleTransmissionStart()
+	public static void startSampleTransmission()
 	{
 		//=======ALICE======
 		KeyPair kp = GenerateRSAKeyPair();
@@ -367,24 +369,29 @@ public class Encrypter {
 	
 	
 	 // decryption function
-	 public static String AESDecrypt(String secretKeyString, String encryptedMsgString) throws Exception 
+	 public static String AESDecrypt(String secretKeyString, String encryptedMsgString) throws InvalidKeyException, IllegalBlockSizeException, BadPaddingException
 	 {
-		 byte[] encryptedMsg = hex2byte(encryptedMsgString);;
+		 byte[] encryptedMsg = hex2byte(encryptedMsgString);
 		 
 		 // generate AES key from the user input secret key
 		 Key key = AESKeyFromString(secretKeyString);
 	
 		 // get the cipher algorithm for AES
-		 Cipher c = Cipher.getInstance("AES");
-	
-		 // specify the decryption mode
-		 c.init(Cipher.DECRYPT_MODE, key);
-	
-		 // decrypt the message
-		 byte[] decValue = c.doFinal(encryptedMsg);
-		 
-		 String decStr = new String(decValue);
-		 return decStr;
+         try {
+             Cipher c = Cipher.getInstance("AES");
+
+
+             // specify the decryption mode
+             c.init(Cipher.DECRYPT_MODE, key);
+
+             // decrypt the message
+             byte[] decValue = c.doFinal(encryptedMsg);
+
+             String decStr = new String(decValue);
+             return decStr;
+         }catch (Exception e){
+             return null;
+         }
 	 }
 	 
 	 
@@ -393,33 +400,18 @@ public class Encrypter {
 	 
 	 public  String AESDecrypt(String encryptedMsgString) throws Exception 
 	 {
-		 byte[] encryptedMsg = hex2byte(encryptedMsgString);;
-		 
-		 // generate AES key from the user input secret key
-		 Key key = AESKeyFromString(AESkey);
-	
-		 // get the cipher algorithm for AES
-		 Cipher c = Cipher.getInstance("AES");
-	
-		 // specify the decryption mode
-		 c.init(Cipher.DECRYPT_MODE, key);
-	
-		 // decrypt the message
-		 byte[] decValue = c.doFinal(encryptedMsg);
-		 
-		 String decStr = new String(decValue);
-		 return decStr;
+		 return AESDecrypt(AESkey, encryptedMsgString);
 	 }
 	 
 	
 	
 	
-	 private static Key AESKeyFromString(String secretKeyString) throws Exception {
+	 private static Key AESKeyFromString(String secretKeyString) {
 		 // generate AES key from string
 		 Key key = new SecretKeySpec(secretKeyString.getBytes(), "AES");
 		 return key;
 	 }
-	
+
 	
 	
 	

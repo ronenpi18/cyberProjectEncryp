@@ -19,7 +19,16 @@ public class ChatsList extends ArrayAdapter<String>{
 	private final ArrayList<Integer> imageId;
     private Typeface textTypeface;
     private int textSize;
-	
+
+	/**
+	 * constructor of chats list
+	 * @param context
+	 * @param web
+	 * @param imageId
+	 * @param lastMsgs
+	 * @param font
+	 * @param textSize
+	 */
 	public ChatsList(Activity context, ArrayList<String> web, ArrayList<Integer> imageId, ArrayList<String> lastMsgs, Typeface font, int textSize) {
 			super(context, R.layout.chats_single, web);
 			this.context = context;
@@ -29,10 +38,12 @@ public class ChatsList extends ArrayAdapter<String>{
 			this.imageId = imageId;
             this.lastMsgs = lastMsgs;
 			}
-	
-	
-	
-	
+
+
+	/**
+	 * void function, which adds to chatlist
+	 * @param object
+	 */
 	@Override
 	public void add(String object) {
 		this.web.add(object);
@@ -47,9 +58,13 @@ public class ChatsList extends ArrayAdapter<String>{
         notifyDataSetChanged();
 	}
 
-
-
-
+	/**
+	 * gets the view and finds the need of bolding the text
+	 * @param position
+	 * @param view
+	 * @param parent
+	 * @return rowView- inflater..
+	 */
 	@Override
 	public View getView(int position, View view, ViewGroup parent) {
 		LayoutInflater inflater = context.getLayoutInflater();
@@ -60,7 +75,7 @@ public class ChatsList extends ArrayAdapter<String>{
         String message =  (String) lastMsgs.toArray()[position];
         boolean encountered = false;
         for(int i = 0; i < message.length(); i++)
-            if(message.charAt(i) == '*')
+            if(message.charAt(i) == '*') //Bold text - to make text bold, we need to set finder of *
             {
                 if(encountered)
                     message = message.replaceFirst("\\*", "</b>");

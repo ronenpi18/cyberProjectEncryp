@@ -6,5 +6,7 @@
     <string name="action_settings">Settings</string>
     <string name="title_activity_secret">Encrypchat</string>
     <string name="title_activity_settings">Encrypchat settings</string>
+    <string name="title_activity_help">Encrypchat - help</string>
+    <string name="title_activity_chat_activity_swipe">ChatActivitySwipe</string>
 
 </resources>

@@ -12,6 +12,7 @@ import java.net.UnknownHostException;
 import java.security.InvalidKeyException;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
 
 import android.app.Activity;
 import android.app.AlertDialog;
@@ -36,18 +37,25 @@ import android.os.Bundle;
 import android.os.SystemClock;
 import android.os.Vibrator;
 import android.provider.MediaStore;
+import android.support.v4.app.Fragment;
+import android.support.v4.app.FragmentActivity;
+import android.support.v4.app.FragmentManager;
+import android.support.v4.app.FragmentPagerAdapter;
+import android.support.v4.app.FragmentStatePagerAdapter;
 import android.support.v4.app.NotificationCompat;
 import android.support.v4.app.TaskStackBuilder;
+import android.support.v4.view.ViewPager;
 import android.text.Html;
 import android.util.Log;
 import android.view.KeyEvent;
+import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.AbsListView;
 import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ListView;
@@ -59,11 +67,10 @@ import org.apache.http.impl.client.DefaultHttpClient;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-public class ChatActivity extends Activity{
-	ListView list;
-	EditText msgEt;
-	ChatList adapter;
-	Button sendBtn;
+public class ChatActivitySwipe extends FragmentActivity {
+    EditText msgEt;
+    ChatList adapter;
+    Button sendBtn;
     Socket echoSocket;
     boolean needNewAes = false;
     boolean activityKilled = false;
@@ -76,110 +83,95 @@ public class ChatActivity extends Activity{
     String sourceNumber;
     int targetDrawable;
     int sourceDrawable;
-    public static String WEB_HOME = "http://encrypchat.bl.ee/";
-	ArrayList<String> web;
-	ArrayList<Integer> imageId;
+    ArrayList<String> web;
+    ArrayList<Integer> imageId;
     ArrayList<String> times;
     Encrypter encrypter;
     String currentMsgsPrefs = "";
-    mTask2 netTask;
     Vibrator vibrator;
     String HASHTAG_STARTER, HASHTAG_ENDER, USERTAG_STARTER, USERTAG_ENDER;
+    ViewPager viewPager;
+    ArrayList<String> numbers;
+    CollectionPagerAdapter collectionPagerAdapter;
+    SharedPreferences prefs;
+    final int MAX_LOAD = 30;
 
-	  @Override
-	  protected void onCreate(Bundle savedInstanceState) {
-	    super.onCreate(savedInstanceState);
-          SharedPreferences prefs = getSharedPreferences(eConstants.PREFERENCES_FILE, 0);
-          web = new ArrayList<String>();
-          imageId = new ArrayList<Integer>();
-          times = new ArrayList<String>();
-          setContentView(R.layout.activity_chat);
-          Typeface msgTypeface = Typeface.createFromAsset(getAssets(), "fonts/Roboto-Light.ttf");
-          adapter = new ChatList(ChatActivity.this, web, imageId, times, msgTypeface, 25);
-          list = (ListView)findViewById(R.id.list);
-          msgEt = (EditText) findViewById(R.id.msg_et);
-          sendBtn = (Button) findViewById(R.id.button_sendMsg);
-          list.setAdapter(adapter);
-          targetNumber = getIntent().getExtras().get(eConstants.EXTRA_TARGET_NUMBER).toString();
-          sourceNumber = prefs.getString(eConstants.PREFS_PHONE_NUMEBR, "");
-          targetNumber = eConstants.getNumberByName(targetNumber);
-          targetDrawable = eConstants.getPpByNumber(targetNumber);
-          setTitle(eConstants.getContactByNumber(targetNumber));
-          sourceDrawable = eConstants.getPpByNumber(sourceNumber);
-          msgEt.setTypeface(msgTypeface);
-          vibrator = (Vibrator) this.getSystemService(Context.VIBRATOR_SERVICE);
-          nextMsgJson = new JSONObject();
-          try {
-              nextMsgJson.put(eConstants.JSON_MSG_FROM, sourceNumber);
-              nextMsgJson.put(eConstants.JSON_MSG_TO, targetNumber);
-              nextMsgJson.put(eConstants.JSON_MSG_TIME, 0);
-              nextMsgJson.put(eConstants.JSON_SERVER_REQTYPE, eConstants.REQTYPE_GETMSG);
-          }catch (Exception e){
-              e.printStackTrace();
-          }
-          if(prefs.getString(targetNumber + "AES", "").equals(""))
-          {
-              encrypter = new Encrypter();
-              SharedPreferences.Editor editor = prefs.edit();
-              editor.putString(targetNumber + "AES", encrypter.getAesKey());
-              editor.commit();
-              needNewAes = true;
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_chat_swipe);
+        prefs = getSharedPreferences(eConstants.PREFERENCES_FILE, 0);
+        sourceNumber = prefs.getString(eConstants.PREFS_PHONE_NUMEBR, "");
+        sourceDrawable = eConstants.getPpByNumber(sourceNumber);
+        targetNumber = getIntent().getExtras().get(eConstants.EXTRA_TARGET_NUMBER).toString();
+        setTitle(eConstants.getContactByNumber(targetNumber));
+        targetDrawable = eConstants.getPpByNumber(targetNumber);
+        if(prefs.getString(targetNumber + "AES", "").equals(""))
+        {
+            encrypter = new Encrypter();
+            SharedPreferences.Editor editor = prefs.edit();
+            editor.putString(targetNumber + "AES", encrypter.getAesKey());
+            editor.commit();
+            needNewAes = true;
 
-          }else{
-              encrypter = new Encrypter(prefs.getString(targetNumber + "AES", ""));
-          }
-          netTask = new mTask2();
-          netTask.execute();
-
-          currentMsgsPrefs = prefs.getString(targetNumber + "MSGS", "");
-          for(int i = 0; i < currentMsgsPrefs.length();)
-          {
-              String currentJson = "";
-              int j;
-              for(j = i; currentMsgsPrefs.charAt(j) != '}'; j++);
-              j+=1;
-              currentJson = currentMsgsPrefs.substring(i,j);
-              try {
-                  JSONObject msgJson = new JSONObject(currentJson);
-                  web.add(msgJson.getString(eConstants.JSON_MSG_CONTENT));
-                  times.add(millis2time(msgJson.getLong(eConstants.JSON_MSG_TIME)));
-                  if(msgJson.getString(eConstants.JSON_MSG_FROM).equals(targetNumber))
-                      imageId.add(targetDrawable);
-                  else
-                      imageId.add(sourceDrawable);
-              }catch (JSONException e){
-                  e.printStackTrace();
-                  Log.e("JSON", "Err reading json in msgs");
-              }
-              i = j;
-          }
-          if(!web.isEmpty())
-            adapter.notifyDataSetChanged();
+        }else{
+            encrypter = new Encrypter(prefs.getString(targetNumber + "AES", ""));
+        }
+        viewPager = (ViewPager) findViewById(R.id.pager);
+        msgEt = (EditText) findViewById(R.id.msg_et);
+        sendBtn = (Button) findViewById(R.id.button_sendMsg);
+        numbers = new ArrayList<String>();
+        String numsStr = prefs.getString(eConstants.PREFS_CHATS, "");
+        String number = "";
+        for(int i = 0; i < numsStr.length(); i++)
+            if(numsStr.charAt(i) == ';')
+            {
+                numbers.add(eConstants.getContactByNumber(number));
+                number = "";
+            }else
+                number += numsStr.charAt(i);
+        adapter = new ChatList(this, web, imageId, times, Typeface.createFromAsset(getAssets(), "fonts/Roboto-Light.ttf"), 20);
+        collectionPagerAdapter = new CollectionPagerAdapter(getSupportFragmentManager(), adapter);
+        viewPager.setAdapter(collectionPagerAdapter);
+        viewPager.setCurrentItem(numbers.indexOf(targetNumber));
+        viewPager.setOffscreenPageLimit(0);
+        msgEt.setTypeface(Typeface.createFromAsset(getAssets(), "fonts/Roboto-Light.ttf"));
+        vibrator = (Vibrator) this.getSystemService(Context.VIBRATOR_SERVICE);
+        nextMsgJson = new JSONObject();
+        try {
+            nextMsgJson.put(eConstants.JSON_MSG_FROM, sourceNumber);
+            nextMsgJson.put(eConstants.JSON_MSG_TO, targetNumber);
+            nextMsgJson.put(eConstants.JSON_MSG_TIME, 0);
+            nextMsgJson.put(eConstants.JSON_SERVER_REQTYPE, eConstants.REQTYPE_GETMSG);
+        }catch (Exception e){
+            e.printStackTrace();
+        }
 
 
 
-        list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+
+        viewPager.setOnPageChangeListener(new ViewPager.OnPageChangeListener() {
             @Override
-            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                Toast.makeText(ChatActivity.this, encrypter.AESEncrypt(web.toArray()[+position].toString()), Toast.LENGTH_SHORT).show();
+            public void onPageScrolled(int position, float positionOffset, int positionOffsetPixels) {
+
             }
 
+            @Override
+            public void onPageSelected(int position) {
+                targetNumber = numbers.get(position);
+                targetDrawable = eConstants.getPpByNumber(targetNumber);
+                setTitle(eConstants.getContactByNumber(targetNumber));
+                encrypter.setAESKey(prefs.getString(targetNumber + "AES", ""));
+            }
+
+            @Override
+            public void onPageScrollStateChanged(int state) {
+
+            }
         });
-        
-        
-        sendBtn.setOnClickListener(new View.OnClickListener() {
-			
-			@Override
-			public void onClick(View v) {
-                sendMsg();
-			}
-		});
-          
-        USERTAG_STARTER = prefs.getString(eConstants.PREFS_SOCIAL_USERTAG_STARTER, eConstants.USERTAG_TWITTER_STARTER);
-        USERTAG_ENDER = prefs.getString(eConstants.PREFS_SOCIAL_USERTAG_ENDER, eConstants.USERTAG_TWITTER_ENDER);
-        HASHTAG_STARTER = prefs.getString(eConstants.PREFS_SOCIAL_HASHTAG_STARTER, eConstants.HASHTAG_TWITTER_STARTER);
-        HASHTAG_ENDER = prefs.getString(eConstants.PREFS_SOCIAL_HASHTAG_ENDER, eConstants.HASHTAG_TWITTER_ENDER);
-	  }
+
+
+    }
 
 
     @Override
@@ -202,16 +194,6 @@ public class ChatActivity extends Activity{
         activityActive = false;
     }
 
-    @Override
-    public void finish(){
-        super.finish();
-    }
-
-
-    @Override
-    public boolean onKeyUp(int keyCode, KeyEvent event) {
-        return super.onKeyUp(keyCode, event);
-    }
 
     private void sendMsg(){
         String message = msgEt.getText().toString();
@@ -323,7 +305,7 @@ public class ChatActivity extends Activity{
         switch (item.getItemId())
         {
             case R.id.action_showaes:
-                AlertDialog.Builder aesDialogBuilder = new AlertDialog.Builder(ChatActivity.this);
+                AlertDialog.Builder aesDialogBuilder = new AlertDialog.Builder(ChatActivitySwipe.this);
                 aesDialogBuilder.setTitle("AES Key");
                 if(partnerPk.equals(""))
                     aesDialogBuilder.setMessage("Conversation AES: " + encrypter.getAesKey());
@@ -354,7 +336,7 @@ public class ChatActivity extends Activity{
                 adapter.notifyDataSetChanged();
                 break;
             case R.id.action_help:
-                Intent i2 = new Intent(ChatActivity.this, HelpActivity.class);
+                Intent i2 = new Intent(ChatActivitySwipe.this, HelpActivity.class);
                 startActivity(i2);
                 break;
         }
@@ -378,6 +360,105 @@ public class ChatActivity extends Activity{
 
 
 
+
+
+
+    public class CollectionPagerAdapter extends FragmentStatePagerAdapter {
+
+
+
+        public CollectionPagerAdapter(FragmentManager fm, ChatList chatAdapter) {
+            super(fm);
+        }
+
+        @Override
+        public Fragment getItem(int i) {
+            Fragment fragment = new ObjectFragment();
+            Bundle args = new Bundle();
+            args.putString(ObjectFragment.ARG_NUMBER, numbers.get(i));
+            //args.putStringArrayList();
+            Log.d("TAG", "getItem");
+            fragment.setArguments(args);
+            return fragment;
+        }
+
+        @Override
+        public int getItemPosition(Object object) {
+            ObjectFragment f = (ObjectFragment) object;
+            if(f != null)
+                f.update();
+            Log.d("TAG", "getItemPosition");
+            return super.getItemPosition(object);
+        }
+
+        @Override
+        public int getCount() {
+            return numbers.size();
+        }
+
+        @Override
+        public CharSequence getPageTitle(int position) {
+            return "OBJECT " + (position);
+        }
+    }
+
+    public class ObjectFragment extends Fragment{
+
+
+        ArrayList<String> currentWeb;
+        ArrayList<String> currentTimes;
+        ArrayList<Integer> currentImageId;
+        ChatList currentAdapter;
+        
+        public static final String ARG_NUMBER = "phone_number";
+        @Override
+        public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+            Bundle args = getArguments();
+            String currentNumber = eConstants.getNumberByName(args.getString(ARG_NUMBER));
+            currentWeb = new ArrayList<String>();
+            currentImageId = new ArrayList<Integer>();
+            currentTimes = new ArrayList<String>();
+            currentAdapter = new ChatList(ChatActivitySwipe.this, currentWeb, currentImageId, currentTimes, Typeface.createFromAsset(getActivity().getAssets(), "fonts/Roboto-Light.ttf"), 25);
+            currentMsgsPrefs = prefs.getString(currentNumber + "MSGS", "");
+            for(int i = currentMsgsPrefs.length()-1, total = 0; i >0 && total < MAX_LOAD;)
+            {
+                total++;
+                String currentJson = "";
+                int j;
+                for(j = i; currentMsgsPrefs.charAt(j) != '{'; j--);
+                currentJson = currentMsgsPrefs.substring(j,++i);
+                try {
+                    JSONObject msgJson = new JSONObject(currentJson);
+                    currentWeb.add(msgJson.getString(eConstants.JSON_MSG_CONTENT));
+                    currentTimes.add(millis2time(msgJson.getLong(eConstants.JSON_MSG_TIME)));
+                    if(msgJson.getString(eConstants.JSON_MSG_FROM).equals(currentNumber))
+                        currentImageId.add(targetDrawable);
+                    else
+                        currentImageId.add(sourceDrawable);
+                }catch (JSONException e){
+                    e.printStackTrace();
+                    Log.e("JSON", "Err reading json in msgs");
+                }
+                i = j-1;
+            }
+            if(!currentWeb.isEmpty()) {
+                Collections.reverse(currentWeb);
+                Collections.reverse(currentImageId);
+                Collections.reverse(currentTimes);
+                currentAdapter.notifyDataSetChanged();
+            } View rootView = inflater.inflate(R.layout.fragment_chat_swipe, container, false);
+            ListView listView = (ListView) rootView.findViewById(R.id.list);
+            listView.setAdapter(currentAdapter);
+            encrypter.setAESKey(prefs.getString(currentNumber + "AES", ""));
+            return rootView;
+        }
+
+
+
+        public void update(){
+
+        }
+    }
 
 
 
@@ -570,7 +651,7 @@ public class ChatActivity extends Activity{
             if (msg[0].equals("0"))
                 return;
             else if (msg[0].equals("DIALOG")) {
-                dialog = new ProgressDialog(ChatActivity.this);
+                dialog = new ProgressDialog(ChatActivitySwipe.this);
                 dialog.setTitle("Changing AES Key...");
                 dialog.setMessage(msg[1]);
                 dialog.setCancelable(false);
@@ -580,12 +661,12 @@ public class ChatActivity extends Activity{
             } else if (msg[0].equals("DONE")) {
                 dialog.dismiss();
             } else if (msg[0].equals("TOAST")) {
-                Toast.makeText(ChatActivity.this, msg[1], Toast.LENGTH_SHORT).show();
+                Toast.makeText(ChatActivitySwipe.this, msg[1], Toast.LENGTH_SHORT).show();
             } else if (msg[0].equals("CON_ERR")) {
                 if(sendBtn.isClickable()) {
                     sendBtn.setClickable(false);
                     sendBtn.setAlpha(0.7f);
-                    Toast.makeText(ChatActivity.this, "Connection error", Toast.LENGTH_LONG).show();
+                    Toast.makeText(ChatActivitySwipe.this, "Connection error", Toast.LENGTH_LONG).show();
                 }
             } else if (msg[0].equals("CON_OK")) {
                 sendBtn.setClickable(true);
@@ -602,10 +683,10 @@ public class ChatActivity extends Activity{
 
 
         public void showNotification(String from, String message){
-            Intent intent = new Intent(ChatActivity.this, ChatsActivity.class);
-            PendingIntent pIntent = PendingIntent.getActivity(ChatActivity.this, 0, intent, 0);
+            Intent intent = new Intent(ChatActivitySwipe.this, ChatsActivity.class);
+            PendingIntent pIntent = PendingIntent.getActivity(ChatActivitySwipe.this, 0, intent, 0);
             NotificationCompat.Builder mBuilder =
-                    new NotificationCompat.Builder(ChatActivity.this)
+                    new NotificationCompat.Builder(ChatActivitySwipe.this)
                             .setSmallIcon(eConstants.getPpByNumber(from))
                             .setContentTitle(eConstants.getContactByNumber(from))
                             .setContentText(Html.fromHtml(message))
@@ -639,299 +720,4 @@ public class ChatActivity extends Activity{
     }
 
 
-    private class mTask extends AsyncTask<String, String, String>
-    {
-        @Override
-        protected String doInBackground(String... data) {
-            establishConnection();
-        /*    if(isNewChat)
-                try {
-                    BufferedReader in = new BufferedReader(new InputStreamReader(echoSocket.getInputStream()));
-                    PrintWriter out = new PrintWriter(echoSocket.getOutputStream(), true);
-                    //Check if friend has tried to connect yet
-                    out.println("1" + sourceNumber + targetNumber);
-                    String msg = in.readLine();
-                    if (msg.equals("0")) {
-                        out.println("3" + targetNumber);
-                        String pk = in.readLine();
-                        String encryptedAes = Encrypter.RSAEncrypt(encrypter.getAesKey(), pk);
-                        out.println("0" + targetNumber + sourceNumber + "/" + encryptedAes);
-                        in.readLine();
-                    }
-                    else
-                        publishProgress(msg);
-                }catch (Exception e){
-                    establishConnection();
-                }*/
-            int x = 0;
-            while(x < 1) {
-                try {
-                    PrintWriter out = new PrintWriter(echoSocket.getOutputStream(), true);
-                    BufferedReader in = new BufferedReader(new InputStreamReader(echoSocket.getInputStream()));
-                    String msg = "";
-                    if(nextMsg.equals("")) {
-                        out.println("1" + sourceNumber + targetNumber);
-                        msg = in.readLine();
-                        if (!msg.equals("0"))
-                            publishProgress(msg);
-                    }else {
-                        out.println("0" + targetNumber + sourceNumber + nextMsg);
-                        nextMsg = "";
-                    }
-                    Thread.sleep(200);
-                }catch (Exception e){
-                    establishConnection();
-                }
-
-
-            }
-            return null;
-        }
-
-
-        private void establishConnection()
-        {
-            try {
-                echoSocket = new Socket(eConstants.SOCKET_HOST, eConstants.SOCKET_PORT);
-            }catch (Exception e){
-                e.printStackTrace();
-            }
-        }
-        @Override
-        protected void onProgressUpdate(String... values) {
-            super.onProgressUpdate(values);
-            String msg = values[0];
-            if(msg.contains("Delivered: "))             //Check if msg from server is delivery report
-                Toast.makeText(ChatActivity.this, msg, Toast.LENGTH_SHORT).show();
-            else if(msg.charAt(0) == '/')
-            {
-                SharedPreferences prefs = getSharedPreferences(eConstants.PREFERENCES_FILE, 0);
-                String encryptedAes = msg.substring(1);
-                String pr = prefs.getString(eConstants.PREFS_PRIVATE_KEY, "SHIEEET");
-                String AesKey = Encrypter.RSADecrypt(encryptedAes, prefs.getString(eConstants.PREFS_PRIVATE_KEY, ""));
-                SharedPreferences.Editor editor = prefs.edit();
-                editor.putString(targetNumber + "AES", AesKey);
-                editor.commit();
-                encrypter.setAESKey(AesKey);
-            }
-            else {
-                web.add(msg);
-                imageId.add(targetDrawable);
-                adapter.notifyDataSetChanged();
-            }
-        }
-
-        @Override
-        protected void onPostExecute(String data) {
-            super.onPostExecute(data);
-            web.add(data);
-            imageId.add(targetDrawable);
-            adapter.notifyDataSetChanged();
-        }
-    }
-
-
-    private class WebSigner extends AsyncTask<String,String,String>
-    {
-        @Override
-        protected String doInBackground(String... args) {
-            String response = "";
-            String url = args[0];
-            DefaultHttpClient client = new DefaultHttpClient();
-            HttpGet httpGet = new HttpGet(url);
-            try {
-                HttpResponse execute = client.execute(httpGet);
-                InputStream content = execute.getEntity().getContent();
-
-                BufferedReader buffer = new BufferedReader(
-                        new InputStreamReader(content));
-                String s = "";
-                while ((s = buffer.readLine()) != null) {
-                    response += s;
-                }
-
-            } catch (Exception e) {
-                e.printStackTrace();
-                Log.e("ERROR", "EXCEPTION");
-            }
-
-            Log.i("INFO", "RESPONSE IS: " + response);
-            return decodeHtml(response);
-        }
-
-
-        public String decodeHtml(String original)
-        {
-            String unfiltered = Html.fromHtml(original).toString();
-            String filtered = "";
-            for(int i = 0; i < unfiltered.length(); i++)
-            {
-                if(i + 5 < unfiltered.length() && unfiltered.substring(i, i+5).equals("Free "))
-                    break;
-                filtered += unfiltered.charAt(i);
-            }
-            return filtered;
-        }
-
-
-
-
-
-
-        @Override
-        protected void onPostExecute(String response) {
-            super.onPostExecute(response);
-            if(response.equals("1"))
-            {
-                Toast.makeText(ChatActivity.this, "User not registered", Toast.LENGTH_SHORT).show();
-            }else{
-                Toast.makeText(ChatActivity.this, "Server error:\n" + response, Toast.LENGTH_SHORT).show();
-            }
-        }
-    }
-
-
-    private class MessageRetriever extends AsyncTask<String,Object,String>
-    {
-        @Override
-        protected String doInBackground(String... args) {
-            String response = "";
-            String url = WEB_HOME + "getpk.php?user=" + targetNumber;
-                DefaultHttpClient client = new DefaultHttpClient();
-                HttpGet httpGet = new HttpGet(url);
-                try {
-                    HttpResponse execute = client.execute(httpGet);
-                    InputStream content = execute.getEntity().getContent();
-
-                    BufferedReader buffer = new BufferedReader(
-                            new InputStreamReader(content));
-                    String s = "";
-                    while ((s = buffer.readLine()) != null) {
-                        response += s;
-                    }
-
-
-                    if(!response.equals("") && response.length() > 5) {
-                        response = decodeHtml(response);
-                        ArrayList<String> newMessages = new ArrayList<String>();
-                        String message = "";
-                        for(int i = 0; i < response.length(); i++)
-                        {
-                            if(response.charAt(i) != '\n')
-                                message += response.charAt(i);
-                            else
-                                newMessages.add(message);
-                        }
-                         publishProgress(newMessages.toArray());
-                        Log.i("TAG", "SOMETHING WAS RECEIVED!");
-                    }
-                    response = "";
-
-
-                }  catch (Exception e)
-                {
-                    Log.e("ERROR", "EXCEPTION");
-                }
-
-
-            int x=1;
-            while(x == 1)
-            {
-                Log.e("TAG", "LOOOOOOP");
-                 response = "";
-                if(!nextMsg.equals("")) {
-                    url = WEB_HOME + "send.php?from=" + sourceNumber + "&to=" + targetNumber + "&message=" + nextMsg + "&time=" + System.currentTimeMillis();
-                    nextMsg = "";
-                    Log.d("TAG", "Sent a message");
-                }else
-                    url = WEB_HOME + "getmsgs.php?user=" + sourceNumber;
-                 client = new DefaultHttpClient();
-                 httpGet = new HttpGet(url);
-                try {
-                    HttpResponse execute = client.execute(httpGet);
-                    InputStream content = execute.getEntity().getContent();
-
-                    BufferedReader buffer = new BufferedReader(
-                            new InputStreamReader(content));
-                    String s = "";
-                    while ((s = buffer.readLine()) != null) {
-                        response += s;
-                    }
-
-
-                    if(!response.equals("") && response.length() > 5) {
-                        response = decodeHtml(response);
-                        ArrayList<String> newMessages = new ArrayList<String>();
-                        String message = "";
-                        for(int i = 0; i < response.length(); i++)
-                        {
-                            if(response.charAt(i) != '\n')
-                                message += response.charAt(i);
-                            else
-                                newMessages.add(message);
-                        }
-                        publishProgress(newMessages.toArray());
-                        Log.i("TAG", "SOMETHING WAS RECEIVED!");
-                    }
-                    response = "";
-                    Thread.sleep(500);
-
-
-                }  catch (Exception e)
-                {
-                    Log.e("ERROR", "EXCEPTION");
-                }
-            }
-
-            Log.i("INFO", "RESPONSE IS: " + response);
-            return decodeHtml(response);
-        }
-
-
-        public String decodeHtml(String original)
-        {
-            String unfiltered = Html.fromHtml(original).toString();
-            String filtered = "";
-            for(int i = 0; i < unfiltered.length(); i++)
-            {
-                if(i + 5 < unfiltered.length() && unfiltered.substring(i, i+5).equals("Free "))
-                    break;
-                filtered += unfiltered.charAt(i);
-            }
-            return filtered;
-        }
-
-
-        @Override
-        protected void onProgressUpdate(Object... values) {
-            super.onProgressUpdate(values);
-            String encodedMsg;
-            String decodedMsg;
-            try {
-                for(int i = 0; i < values.length; i++) {
-                    encodedMsg = values[i].toString();
-                    decodedMsg = encodedMsg.substring(1);
-                    if(encodedMsg.charAt(0) == '1')
-                        encrypter.setAESKey(decodedMsg);
-                    else {
-                       //WAS ADAPTER.POSTMESSAGE
-                    }
-                }
-            }catch (Exception e){
-                int x;
-            }
-        }
-
-
-        @Override
-        protected void onPostExecute(String response) {
-            super.onPostExecute(response);
-            if(response.equals("1"))
-            {
-                Toast.makeText(ChatActivity.this, "User not registered", Toast.LENGTH_SHORT).show();
-            }else{
-                //Toast.makeText(ChatActivity.this, "Server error:\n" + response, Toast.LENGTH_SHORT).show();
-            }
-        }
-    }
 }
